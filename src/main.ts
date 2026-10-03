@@ -117,7 +117,7 @@ async function start(): Promise<void> {
   });
 
   // フリック。指を離すのを待たず、決まった長さを動かした時点で1マス動く。
-  // そのまま動かし続ければ、続けて次のマスへ動ける。
+  // 1回のフリックで動くのは1マスまで（勢いで2マス動かないように）。次に動くには指を離す。
   let anchor: { id: number; x: number; y: number } | null = null;
   stage.addEventListener('pointerdown', (e) => {
     anchor = { id: e.pointerId, x: e.clientX, y: e.clientY };
@@ -130,7 +130,7 @@ async function start(): Promise<void> {
     const dy = e.clientY - anchor.y;
     if (Math.max(Math.abs(dx), Math.abs(dy)) < SWIPE_PX) return;
     push(Math.abs(dx) > Math.abs(dy) ? { dx: Math.sign(dx), dy: 0, dz: 0 } : { dx: 0, dy: Math.sign(dy), dz: 0 });
-    anchor = { id: e.pointerId, x: e.clientX, y: e.clientY };
+    anchor = null;
   });
   const release = (e: PointerEvent) => {
     if (anchor?.id === e.pointerId) anchor = null;
