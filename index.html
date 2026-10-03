@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Web Game Template</title>
+  <title>GRID DODGE</title>
   <link rel="icon" href="data:,">
   <style>
     * { box-sizing: border-box; }
@@ -13,7 +13,8 @@
     #hud { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 12px; font-size: 14px; }
     #mute { background: #1c2e45; color: inherit; border: 1px solid #3d6090; border-radius: 6px; padding: 4px 10px; cursor: pointer; }
     /* stage は canvas の大きさに左右されない寸法を持つ（kit/scale の前提） */
-    #stage { position: relative; min-height: 0; }
+    /* フリックは canvas の外（余白）でも受けるので、stage 全体でブラウザの操作を止める */
+    #stage { position: relative; min-height: 0; touch-action: none; user-select: none; -webkit-user-select: none; }
     #game { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); touch-action: none; }
   </style>
 </head>
