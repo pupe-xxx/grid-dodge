@@ -15,9 +15,13 @@
   },
   "devDependencies": {
     "@types/node": "^26.6.3",
+    "@types/three": "^0.186.0",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
     "vite": "^8.3.2",
     "vitest": "^5.0.3"
+  },
+  "dependencies": {
+    "three": "^0.186.1"
   }
 }
