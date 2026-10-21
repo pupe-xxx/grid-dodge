@@ -13,12 +13,22 @@ const HALF = 1.5 * CELL;
 /** 穴の内壁までの半分の幅 */
 const WALL = HALF + 0.45;
 /** 障害は、撃たれる刻みのこれだけ下から上がってくる */
-const RISE_FROM = 60;
+const RISE_FROM = 55;
 /** 壁の1区切りの長さと数。区切りを上へ流して、落ちているように見せる */
 const SEG_LEN = 4;
 const SEG_COUNT = 24;
 const SEG_TOP = 16;
-const FOV = 55;
+/** 縦の視野角。縦長の画面では広げて、穴の奥を上に見せる */
+const FOV_WIDE = 55;
+const FOV_TALL = 68;
+/** 斜めに見下ろす角度の強さ。穴の底（消える点）が、画面の真ん中から上の端までのこの割合の所に来る */
+const TILT = 0.72;
+/** 穴の底の光る面の深さ。障害はこの光を背に影絵で見える */
+const CORE_Y = -78;
+/** 灯りの枠を置く間隔（壁の区切りの数） */
+const FRAME_EVERY = 3;
+/** 作る壁の向き（0: +z, 1: +x, 2: -z, 3: -x）。-z はカメラの側なので作らない */
+const WALL_SIDES = [0, 1, 3] as const;
 
 const COLORS = {
   fog: 0x0a0810,
@@ -104,7 +114,6 @@ function wallPanel(seed: number): THREE.BufferGeometry {
 interface Segment {
   group: THREE.Group;
   index: number;
-  /** 壁の飾り。キャラより上に来たら隠す（カメラの手前を大きく横切ってじゃまになるため） */
   decor: THREE.Group;
 }
 
@@ -139,22 +148,35 @@ export function createShaftView(canvas: HTMLCanvasElement): ShaftView {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.15;
+  renderer.localClippingEnabled = true;
+  // キャラより上の壁は描かない（カメラの手前を大きく横切って、盤が見づらくなるため）。穴をのぞき込む形になる
+  const belowPlayer = [new THREE.Plane(new THREE.Vector3(0, -1, 0), 0.2)];
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(COLORS.fog);
   scene.fog = new THREE.Fog(COLORS.fog, 20, 70);
 
-  const camera = new THREE.PerspectiveCamera(FOV, 1, 0.5, 200);
+  const camera = new THREE.PerspectiveCamera(FOV_WIDE, 1, 0.5, 220);
   camera.up.set(0, 0, -1);
   let cameraHeight = 14;
+  const camHome = new THREE.Vector3(0, 14, 0);
+  const camTarget = new THREE.Vector3();
   let shake = 0;
 
   // ── 明かり ─────────────────────────────
   scene.add(new THREE.HemisphereLight(0x5a6c90, 0x2a1608, 0.9));
   // 穴の底の溶岩の照り返し。上がってくる岩を下から照らす
-  const deepGlow = new THREE.PointLight(0xff7a2a, 900, 90, 1.6);
-  deepGlow.position.set(0, -55, 0);
+  const deepGlow = new THREE.PointLight(0xff7a2a, 1400, 70, 1.5);
+  deepGlow.position.set(0, CORE_Y + 8, 0);
   scene.add(deepGlow);
+  // 穴の底の溶岩。霧に隠さず、いつも明るく見せる
+  const core = new THREE.Mesh(
+    new THREE.PlaneGeometry(WALL * 2.2, WALL * 2.2),
+    new THREE.MeshBasicMaterial({ color: 0xff8a3a, fog: false }),
+  );
+  core.rotation.x = -Math.PI / 2;
+  core.position.y = CORE_Y;
+  scene.add(core);
   // キャラの明かり。手元と、下へ向けた灯り
   const lampNear = new THREE.PointLight(0xffd59a, 10, 6, 1.4);
   scene.add(lampNear);
@@ -163,20 +185,26 @@ export function createShaftView(canvas: HTMLCanvasElement): ShaftView {
 
   // ── 壁 ─────────────────────────────────
   const rng: Rng = createRng(11);
-  const rockMats = COLORS.rock.map((c) => new THREE.MeshStandardMaterial({ color: c, roughness: 1, flatShading: true }));
-  const crystalMats = COLORS.crystal.map(
-    (c) => new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 1.6, roughness: 0.3, flatShading: true }),
+  const rockMats = COLORS.rock.map(
+    (c) => new THREE.MeshStandardMaterial({ color: c, roughness: 1, flatShading: true, clippingPlanes: belowPlayer }),
   );
-  const lampMat = new THREE.MeshBasicMaterial({ color: COLORS.lamp });
-  const woodMat = new THREE.MeshStandardMaterial({ color: COLORS.wood, roughness: 0.9, flatShading: true });
+  const crystalMats = COLORS.crystal.map(
+    (c) => new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 1.6, roughness: 0.3, flatShading: true, clippingPlanes: belowPlayer }),
+  );
+  const lampMat = new THREE.MeshBasicMaterial({ color: COLORS.lamp, clippingPlanes: belowPlayer });
+  const headLampMat = new THREE.MeshBasicMaterial({ color: COLORS.lamp });
+  const woodMat = new THREE.MeshStandardMaterial({ color: COLORS.wood, roughness: 0.9, flatShading: true, clippingPlanes: belowPlayer });
   const ironMat = new THREE.MeshStandardMaterial({ color: COLORS.iron, roughness: 0.6, metalness: 0.6 });
   const crystalGeo = new THREE.ConeGeometry(0.22, 1.2, 5);
+  const frameGeo = new THREE.BoxGeometry(WALL * 2, 0.12, 0.12);
+  const frameMat = new THREE.MeshBasicMaterial({ color: 0xffb35c, clippingPlanes: belowPlayer });
 
   const segments: Segment[] = [];
   for (let i = 0; i < SEG_COUNT; i++) {
     const group = new THREE.Group();
     const mat = rockMats[i % rockMats.length]!;
-    for (let side = 0; side < 4; side++) {
+    // カメラは奥の列（-z）の側に寄るので、その側の壁は見えない。でこぼこの面の裏が黒い破片に見えるため、作らない
+    for (const side of WALL_SIDES) {
       const panel = new THREE.Mesh(wallPanel(i * 4 + side), mat);
       const a = (side * Math.PI) / 2;
       // 面の向きを穴の内側にそろえる
@@ -188,7 +216,7 @@ export function createShaftView(canvas: HTMLCanvasElement): ShaftView {
     const decor = new THREE.Group();
     group.add(decor);
     const roll = rng.next();
-    const side = rng.int(4);
+    const side = WALL_SIDES[rng.int(WALL_SIDES.length)]!;
     const a = (side * Math.PI) / 2;
     const along = (rng.next() - 0.5) * WALL * 1.4;
     const out = new THREE.Vector3(Math.sin(a), 0, Math.cos(a));
@@ -219,6 +247,16 @@ export function createShaftView(canvas: HTMLCanvasElement): ShaftView {
         decor.add(post);
       }
     }
+    if (i % FRAME_EVERY === 0) {
+      // 灯りの枠。等しい間隔で奥へ縮んで並び、深さが分かる
+      for (let k = 0; k < 4; k++) {
+        const bar = new THREE.Mesh(frameGeo, frameMat);
+        const b = (k * Math.PI) / 2;
+        bar.position.set(Math.sin(b) * (WALL - 0.12), SEG_LEN / 2, Math.cos(b) * (WALL - 0.12));
+        bar.rotation.y = b;
+        decor.add(bar);
+      }
+    }
     scene.add(group);
     segments.push({ group, index: i, decor });
   }
@@ -236,7 +274,7 @@ export function createShaftView(canvas: HTMLCanvasElement): ShaftView {
   });
   const streakGeo = new THREE.BufferGeometry();
   streakGeo.setAttribute('position', new THREE.BufferAttribute(streakPos, 3));
-  const streakMat = new THREE.LineBasicMaterial({ color: 0xa9dcff, transparent: true, opacity: 0.35, fog: true });
+  const streakMat = new THREE.LineBasicMaterial({ color: 0xa9dcff, transparent: true, opacity: 0.35, clippingPlanes: belowPlayer });
   scene.add(new THREE.LineSegments(streakGeo, streakMat));
 
   const DUST = 260;
@@ -251,7 +289,7 @@ export function createShaftView(canvas: HTMLCanvasElement): ShaftView {
   scene.add(
     new THREE.Points(
       dustGeo,
-      new THREE.PointsMaterial({ color: 0xffd9a8, size: 0.07, transparent: true, opacity: 0.7, sizeAttenuation: true }),
+      new THREE.PointsMaterial({ color: 0xffd9a8, size: 0.07, transparent: true, opacity: 0.7, sizeAttenuation: true, clippingPlanes: belowPlayer }),
     ),
   );
 
@@ -276,13 +314,27 @@ export function createShaftView(canvas: HTMLCanvasElement): ShaftView {
   };
   const marks: CellMarks[] = [];
   const fillGeo = new THREE.PlaneGeometry(CELL * 0.94, CELL * 0.94);
-  const ringGeo = new THREE.RingGeometry(0.84, 1, 40);
-  const squareGeo = new THREE.RingGeometry(0.88, 1, 4, 1, Math.PI / 4);
+  const ringGeo = new THREE.RingGeometry(0.93, 1, 40);
+  const squareGeo = new THREE.RingGeometry(0.95, 1, 4, 1, Math.PI / 4);
+  // 予告の塗りは、真ん中が濃く外へ薄れるぼんやりした光にする（硬い四角だと強すぎる）
+  const glowTex = (() => {
+    const c = document.createElement('canvas');
+    c.width = c.height = 64;
+    const g = c.getContext('2d')!;
+    const grad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    grad.addColorStop(0, 'rgba(255,255,255,1)');
+    grad.addColorStop(0.6, 'rgba(255,255,255,0.45)');
+    grad.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = grad;
+    g.fillRect(0, 0, 64, 64);
+    return new THREE.CanvasTexture(c);
+  })();
   for (let gy = 0; gy < 3; gy++) {
     for (let gx = 0; gx < 3; gx++) {
       const basic = (color: number) =>
         new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide });
       const fill = new THREE.Mesh(fillGeo, basic(COLORS.warn));
+      fill.material.map = glowTex;
       const ring = new THREE.Mesh(ringGeo, basic(COLORS.warn));
       const square = new THREE.Mesh(squareGeo, basic(COLORS.warn));
       const flash = new THREE.Mesh(fillGeo, basic(COLORS.graze));
@@ -314,7 +366,7 @@ export function createShaftView(canvas: HTMLCanvasElement): ShaftView {
   const head = new THREE.Mesh(new THREE.IcosahedronGeometry(0.22, 1), helmetMat);
   head.position.set(0, 0.05, -0.55);
   body.add(head);
-  const headLamp = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.06, 8), lampMat);
+  const headLamp = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.06, 8), headLampMat);
   headLamp.position.set(0, 0.12, -0.74);
   headLamp.rotation.x = Math.PI / 2;
   body.add(headLamp);
@@ -346,10 +398,10 @@ export function createShaftView(canvas: HTMLCanvasElement): ShaftView {
   // ── 障害 ───────────────────────────────
   // 遠くでも形が分かるよう、障害は少し自分で光らせる
   const boulderMat = new THREE.MeshStandardMaterial({
-    color: COLORS.boulder, emissive: 0x3a2414, emissiveIntensity: 1, roughness: 1, flatShading: true,
+    color: COLORS.boulder, emissive: 0x6a4024, emissiveIntensity: 1, roughness: 1, flatShading: true,
   });
   const beamWoodMat = new THREE.MeshStandardMaterial({
-    color: COLORS.wood, emissive: 0x3a2008, emissiveIntensity: 1, roughness: 0.9, flatShading: true,
+    color: COLORS.wood, emissive: 0x6a3a10, emissiveIntensity: 1, roughness: 0.9, flatShading: true,
   });
   const boulderGeos = [0, 1, 2].map((s) => rockGeometry(0.88, 100 + s));
   const lavaMat = new THREE.MeshStandardMaterial({
@@ -470,12 +522,12 @@ export function createShaftView(canvas: HTMLCanvasElement): ShaftView {
           else warnLine = Math.max(warnLine, p);
         }
         const p = Math.max(warnLine, warnRock);
-        m.fill.material.opacity = firing ? 0.55 : p >= 0 ? 0.08 + 0.32 * p : 0;
+        m.fill.material.opacity = firing ? 0.5 : p >= 0 ? 0.04 + 0.3 * p * p : 0;
         // 外から真ん中へ縮む枠。縮み切った時に撃たれる
         const shrink = (q: number) => CELL * 0.46 * (1 - q) + 0.12;
-        m.ring.material.opacity = warnRock >= 0 ? 0.95 : 0;
+        m.ring.material.opacity = warnRock >= 0 ? 0.25 + 0.45 * warnRock : 0;
         m.ring.scale.setScalar(shrink(Math.max(0, warnRock)));
-        m.square.material.opacity = warnLine >= 0 ? 0.95 : 0;
+        m.square.material.opacity = warnLine >= 0 ? 0.25 + 0.45 * warnLine : 0;
         m.square.scale.setScalar(shrink(Math.max(0, warnLine)) * Math.SQRT2);
         m.flashLeft = Math.max(0, m.flashLeft - dt);
         m.flash.material.opacity = m.flashLeft * 2.2;
@@ -513,7 +565,6 @@ export function createShaftView(canvas: HTMLCanvasElement): ShaftView {
     for (const s of segments) {
       const raw = fall - s.index * SEG_LEN - bottom;
       s.group.position.y = (((raw % total) + total) % total) + bottom;
-      s.decor.visible = s.group.position.y < -SEG_LEN;
     }
     const range = 80;
     for (let i = 0; i < STREAKS; i++) {
@@ -555,12 +606,20 @@ export function createShaftView(canvas: HTMLCanvasElement): ShaftView {
       viewH = height;
       renderer.setSize(width, height, false);
       camera.aspect = width / height;
-      // 盤が縦にも横にも収まる高さに置く
-      const vHalf = THREE.MathUtils.degToRad(FOV / 2);
+      // 盤の上側（奥の列）寄りから、手前の列の向きへ斜めに見下ろす。穴の底が画面の上のほうに来て、奥行きが見える。
+      // 盤が縦にも横にも収まる距離に置く
+      const tall = camera.aspect < 1;
+      camera.fov = tall ? FOV_TALL : FOV_WIDE;
+      const vHalf = THREE.MathUtils.degToRad(camera.fov / 2);
       const hHalf = Math.atan(Math.tan(vHalf) * camera.aspect);
-      cameraHeight = (WALL * 1.08) / Math.tan(Math.min(vHalf, hHalf));
+      const tilt = Math.atan(TILT * Math.tan(vHalf));
+      const dist = Math.max((WALL * 1.12) / Math.tan(hHalf), (WALL * 1.3) / Math.tan(vHalf));
+      cameraHeight = dist * Math.cos(tilt);
+      camHome.set(0, cameraHeight, -dist * Math.sin(tilt));
+      // 縦長の画面では、盤を少し下げて、上の空きを穴の奥に使う
+      camTarget.set(0, 0, tall ? -WALL * 0.55 : 0);
       camera.updateProjectionMatrix();
-      scene.fog = new THREE.Fog(COLORS.fog, cameraHeight + 8, cameraHeight + 62);
+      scene.fog = new THREE.Fog(COLORS.fog, dist + 15, dist + 95);
     },
 
     render(frame) {
@@ -575,8 +634,8 @@ export function createShaftView(canvas: HTMLCanvasElement): ShaftView {
       shake = Math.max(0, shake - dt * 1.8);
       const sx = (Math.random() - 0.5) * shake * 0.8;
       const sz = (Math.random() - 0.5) * shake * 0.8;
-      camera.position.set(sx, cameraHeight, cameraHeight * 0.1 + sz);
-      camera.lookAt(sx * 0.5, 0, sz * 0.5);
+      camera.position.set(camHome.x + sx, camHome.y, camHome.z + sz);
+      camera.lookAt(camTarget.x + sx * 0.5, camTarget.y, camTarget.z + sz * 0.5);
       renderer.render(scene, camera);
     },
 

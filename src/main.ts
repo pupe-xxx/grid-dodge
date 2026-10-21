@@ -18,9 +18,6 @@ const MAX_QUEUED = 2;
 const RESTART_WAIT = 30;
 /** キャラがマスからマスへ寄っていく速さ（1刻みで残りの何割を進むか） */
 const SHIP_EASE = 0.4;
-/** すれすれの時に時間を遅くする長さ（画面の刻み）と速さ */
-const SLOW_FRAMES = 16;
-const SLOW_SCALE = 0.35;
 /** 落ちる速さ（メートル毎秒）を、壁が流れる量（ワールドの単位毎秒）に直す倍率 */
 const FALL_UNITS_PER_METER = 1.6;
 
@@ -69,10 +66,6 @@ async function start(): Promise<void> {
   let fall = 0;
   /** 落ちる速さに掛ける倍率。当たった後は 0 へ落ちていく */
   let fallMul = 0.5;
-  let timeScale = 1;
-  let slowLeft = 0;
-  /** ルールを進める分の端数（時間を遅くしている間に溜まる） */
-  let carry = 0;
   let lastRender = performance.now();
   const queue: Move[] = [];
 
@@ -117,9 +110,6 @@ async function start(): Promise<void> {
     shipY = state.player.y;
     queue.length = 0;
     fallMul = 1;
-    timeScale = 1;
-    slowLeft = 0;
-    carry = 0;
     view.reset();
     phase = 'playing';
     showScreens();
@@ -166,26 +156,15 @@ async function start(): Promise<void> {
       popText(`すれすれ +${GRAZE_BONUS}`, state.player.x, state.player.y);
       flashScreen('rgba(255, 255, 255, 0.18)', 260);
       sound.tone(1400, 90, 0.12);
-      slowLeft = SLOW_FRAMES;
     }
     if (!state.alive) finish();
   };
 
   const update = () => {
     frame++;
-    if (phase === 'playing') {
-      timeScale = slowLeft > 0 ? SLOW_SCALE : 1;
-      if (slowLeft > 0) slowLeft--;
-      carry += timeScale;
-      while (carry >= 1 && phase === 'playing') {
-        carry -= 1;
-        tickOnce();
-      }
-    } else {
-      timeScale = 1;
-    }
+    if (phase === 'playing') tickOnce();
     if (phase === 'over') fallMul = Math.max(0, fallMul - 0.03);
-    fall += (fallSpeed(state.tick) * FALL_UNITS_PER_METER * fallMul * timeScale) / 60;
+    fall += (fallSpeed(state.tick) * FALL_UNITS_PER_METER * fallMul) / 60;
     shipX += (state.player.x - shipX) * SHIP_EASE;
     shipY += (state.player.y - shipY) * SHIP_EASE;
   };
@@ -195,7 +174,7 @@ async function start(): Promise<void> {
     const now = performance.now();
     const dt = (now - lastRender) / 1000;
     lastRender = now;
-    const tickF = phase === 'playing' ? state.tick + Math.min(0.999, carry + alpha * timeScale) : state.tick;
+    const tickF = phase === 'playing' ? state.tick + alpha : state.tick;
     view.render({ state, tickF, shipX, shipY, fall, dt });
     const text = `深さ ${scoreOf(state.tick, grazes)} m　最高 ${record.best} m`;
     if (text !== shown) status.textContent = shown = text;
