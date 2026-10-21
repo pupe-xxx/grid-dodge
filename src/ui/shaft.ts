@@ -13,22 +13,31 @@ const HALF = 1.5 * CELL;
 /** 穴の内壁までの半分の幅 */
 const WALL = HALF + 0.45;
 /** 障害は、撃たれる刻みのこれだけ下から上がってくる */
-const RISE_FROM = 55;
+const RISE_FROM = 42;
 /** 壁の1区切りの長さと数。区切りを上へ流して、落ちているように見せる */
 const SEG_LEN = 4;
 const SEG_COUNT = 24;
 const SEG_TOP = 16;
-/** 縦の視野角。縦長の画面では広げて、穴の奥を上に見せる */
-const FOV_WIDE = 55;
-const FOV_TALL = 68;
-/** 斜めに見下ろす角度の強さ。穴の底（消える点）が、画面の真ん中から上の端までのこの割合の所に来る */
-const TILT = 0.72;
+/**
+ * 縦の視野角。狭くして遠くから見る。広いと奥の障害がみな真ん中に寄り、どのマスに来るか分からなくなる。
+ * 狭いと、奥でもマスどうしが離れて見える
+ */
+const FOV_WIDE = 20;
+const FOV_TALL = 24;
+/**
+ * 斜めに見下ろす角度の強さ。穴の底（消える点）が、画面の真ん中から上の端までのこの割合の所に来る。
+ * 強く斜めにすると、障害がどのマスに来るかが分かりにくくなる（本人／2026-10-21）ので、ほぼ真上から見る
+ */
+const TILT = 0.12;
+/** マスの筋（3x3 の格子）を穴の奥へ並べる間隔と数。障害がどのマスを上がってくるかを見せる */
+const LANE_STEP = 5;
+const LANE_COUNT = 16;
 /** 穴の底の光る面の深さ。障害はこの光を背に影絵で見える */
 const CORE_Y = -78;
 /** 灯りの枠を置く間隔（壁の区切りの数） */
 const FRAME_EVERY = 3;
-/** 作る壁の向き（0: +z, 1: +x, 2: -z, 3: -x）。-z はカメラの側なので作らない */
-const WALL_SIDES = [0, 1, 3] as const;
+/** 作る壁の向き（0: +z, 1: +x, 2: -z, 3: -x） */
+const WALL_SIDES = [0, 1, 2, 3] as const;
 
 const COLORS = {
   fog: 0x0a0810,
@@ -156,7 +165,7 @@ export function createShaftView(canvas: HTMLCanvasElement): ShaftView {
   scene.background = new THREE.Color(COLORS.fog);
   scene.fog = new THREE.Fog(COLORS.fog, 20, 70);
 
-  const camera = new THREE.PerspectiveCamera(FOV_WIDE, 1, 0.5, 220);
+  const camera = new THREE.PerspectiveCamera(FOV_WIDE, 1, 0.5, 300);
   camera.up.set(0, 0, -1);
   let cameraHeight = 14;
   const camHome = new THREE.Vector3(0, 14, 0);
@@ -203,7 +212,6 @@ export function createShaftView(canvas: HTMLCanvasElement): ShaftView {
   for (let i = 0; i < SEG_COUNT; i++) {
     const group = new THREE.Group();
     const mat = rockMats[i % rockMats.length]!;
-    // カメラは奥の列（-z）の側に寄るので、その側の壁は見えない。でこぼこの面の裏が黒い破片に見えるため、作らない
     for (const side of WALL_SIDES) {
       const panel = new THREE.Mesh(wallPanel(i * 4 + side), mat);
       const a = (side * Math.PI) / 2;
@@ -306,6 +314,16 @@ export function createShaftView(canvas: HTMLCanvasElement): ShaftView {
     new THREE.LineBasicMaterial({ color: COLORS.grid, transparent: true, opacity: 0.22, depthWrite: false }),
   );
   scene.add(grid);
+
+  // マスの筋。3x3 の格子を一定の間隔で穴の奥へ並べ、上へ流す。
+  // 障害はいつも自分のマスの筋の中を上がってくるので、遠くでもどのマスに来るかが分かる
+  const laneMat = new THREE.LineBasicMaterial({ color: 0xffc98a, transparent: true, opacity: 0.16, depthWrite: false });
+  const laneRings: THREE.LineSegments[] = [];
+  for (let i = 0; i < LANE_COUNT; i++) {
+    const ring = new THREE.LineSegments(gridGeo, laneMat);
+    laneRings.push(ring);
+    scene.add(ring);
+  }
 
   const flat = (m: THREE.Object3D, y: number) => {
     m.rotation.x = -Math.PI / 2;
@@ -579,6 +597,12 @@ export function createShaftView(canvas: HTMLCanvasElement): ShaftView {
       dustPos.set([d.x, y, d.z], i * 3);
     }
     dustGeo.attributes.position!.needsUpdate = true;
+    const laneRange = LANE_STEP * LANE_COUNT;
+    laneRings.forEach((ring, i) => {
+      const raw = fall * 1.0 - i * LANE_STEP;
+      ring.position.y = -(((-raw % laneRange) + laneRange) % laneRange) - 0.01;
+      ring.visible = ring.position.y < -1;
+    });
   };
 
   const updateDebris = (dt: number) => {
@@ -616,8 +640,7 @@ export function createShaftView(canvas: HTMLCanvasElement): ShaftView {
       const dist = Math.max((WALL * 1.12) / Math.tan(hHalf), (WALL * 1.3) / Math.tan(vHalf));
       cameraHeight = dist * Math.cos(tilt);
       camHome.set(0, cameraHeight, -dist * Math.sin(tilt));
-      // 縦長の画面では、盤を少し下げて、上の空きを穴の奥に使う
-      camTarget.set(0, 0, tall ? -WALL * 0.55 : 0);
+      camTarget.set(0, 0, 0);
       camera.updateProjectionMatrix();
       scene.fog = new THREE.Fog(COLORS.fog, dist + 15, dist + 95);
     },
