@@ -22,7 +22,7 @@ body{font-size:14px}
 [hidden]{display:none!important}
 body{background:var(--bg);color:var(--ink);font-family:var(--f-jp);overflow:hidden;
   -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
-#app{height:100vh;height:100dvh;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);display:flex;flex-direction:column;
+#app{touch-action:none;height:100vh;height:100dvh;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);display:flex;flex-direction:column;
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 #hud{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;padding-block:10px 4px}
 #hud .l{min-width:0}
@@ -136,7 +136,7 @@ try{const s=JSON.parse(localStorage.getItem('gdlab-cfg')||'null'); if(s) Object.
 function saveCfg(){try{localStorage.setItem('gdlab-cfg',JSON.stringify(cfg));}catch(e){}}
 const NOTES={
  size:{'3':'今と同じ 3×3。','4':'4×4 で固定。','5':'5×5 で固定。','grow':'3×3 から始まり、30 秒で 4×4、60 秒で 5×5 に区画が広がる。'},
- ctrl:{drag:'画面のどこでもフリック。1回のフリックで動くのは1マスだけ。指を少し動かした時点で動き、次は指を離してから。',tap:'行きたいマスをタップ。1マスずつ滑って動く（途中のマスでも当たる）。'},
+ ctrl:{drag:'画面のどこでもフリック。1回のフリックで動くのは1マスだけで、次は指を離してから。両手の指で交互にフリックしてもよい。',tap:'行きたいマスをタップ。1マスずつ滑って動く（途中のマスでも当たる）。'},
  mode:{phase:'15 秒ごとに新しい障害が1つ加わる。90 秒からは全部が混ざる。',pick:'選んだ障害だけが出る。難しさは時間で上がる。'}
 };
 function renderCfg(){
@@ -144,7 +144,7 @@ function renderCfg(){
   $('#sizeNote').textContent=NOTES.size[cfg.size]; $('#ctrlNote').textContent=NOTES.ctrl[cfg.ctrl]; $('#modeNote').textContent=NOTES.mode[cfg.mode];
   $('#chips').hidden=cfg.mode!=='pick';
   $('#chips').querySelectorAll('.chip').forEach(c=>c.setAttribute('aria-pressed',String(!!cfg.types[c.dataset.t])));
-  $('#foot').textContent=(cfg.ctrl==='drag'?'A フリック：1回で1マス、次は指を離してから':'B タップ：行きたいマスをタップ')+'　／　キーは矢印・WASD';
+  $('#foot').textContent=(cfg.ctrl==='drag'?'A フリック：1回で1マス、次は指を離してから':'B タップ：行きたいマスをタップ')+'　／　キーは矢印・WASD　（試作 v3）';
   updateBest();
 }
 document.querySelectorAll('.seg').forEach(seg=>seg.addEventListener('click',e=>{const b=e.target.closest('button'); if(!b)return; cfg[seg.dataset.k]=b.dataset.v; saveCfg(); renderCfg();}));
@@ -444,25 +444,32 @@ window.addEventListener('keydown',e=>{
   const k=KEYS[e.key.length===1?e.key.toLowerCase():e.key]; if(!k)return; e.preventDefault();
   const now=performance.now(); if(e.repeat&&now-lastKey<95)return; lastKey=now; G.path=[]; tryMove(k[0],k[1]);
 });
-let anchor=null;
-stage.addEventListener('pointerdown',e=>{ if(!G||!G.alive)return; anchor={id:e.pointerId,x:e.clientX,y:e.clientY,sx:e.clientX,sy:e.clientY}; try{stage.setPointerCapture(e.pointerId);}catch(_){} });
-stage.addEventListener('pointermove',e=>{
-  if(cfg.ctrl!=='drag'||!anchor||anchor.id!==e.pointerId||anchor.used)return;
-  const th=Math.max(14,Math.min(28,CS*.2)), dx=e.clientX-anchor.x, dy=e.clientY-anchor.y;
+// 指ごとに覚える。両手で触っても、どの指も1回のタッチで1マスだけ動く
+const touches=new Map(), app=document.querySelector('#app');
+app.addEventListener('pointerdown',e=>{
+  if(!G||!G.alive||e.target.closest('button'))return;
+  e.preventDefault();
+  touches.set(e.pointerId,{x:e.clientX,y:e.clientY,used:false});
+  try{app.setPointerCapture(e.pointerId);}catch(_){}
+});
+app.addEventListener('pointermove',e=>{
+  const t=touches.get(e.pointerId);
+  if(cfg.ctrl!=='drag'||!t||t.used)return;
+  const th=Math.max(14,Math.min(28,CS*.2)), dx=e.clientX-t.x, dy=e.clientY-t.y;
   if(Math.abs(dx)<th&&Math.abs(dy)<th)return;
+  t.used=true;
   if(Math.abs(dx)>Math.abs(dy))tryMove(Math.sign(dx),0); else tryMove(0,Math.sign(dy));
-  anchor.used=true;
 });
 function release(e){
-  if(!anchor||anchor.id!==e.pointerId)return;
-  if(cfg.ctrl==='tap'&&G&&G.alive&&e.type==='pointerup'){
+  const t=touches.get(e.pointerId); if(!t)return;
+  touches.delete(e.pointerId);
+  if(cfg.ctrl==='tap'&&!t.used&&G&&G.alive&&e.type==='pointerup'){
     const r=stage.getBoundingClientRect(), x=e.clientX-r.left, y=e.clientY-r.top;
     const tx=Math.floor((x-BX+GAP/2)/(CS+GAP)), ty=Math.floor((y-BY+GAP/2)/(CS+GAP));
     if(inside(tx,ty)) planPath(tx,ty);
   }
-  anchor=null;
 }
-stage.addEventListener('pointerup',release); stage.addEventListener('pointercancel',release);
+app.addEventListener('pointerup',release); app.addEventListener('pointercancel',release);
 function planPath(tx,ty){
   // 横が先か縦が先か、今ふさがっていない方を選ぶ
   const mk=hf=>{const p=[];let x=G.px,y=G.py; const sx=Math.sign(tx-x),sy=Math.sign(ty-y);
