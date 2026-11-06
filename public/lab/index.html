@@ -135,16 +135,16 @@ const cfg={size:'grow',ctrl:'drag',mode:'phase',types:{laser:true,beam:true,pane
 try{const s=JSON.parse(localStorage.getItem('gdlab-cfg')||'null'); if(s) Object.assign(cfg,s);}catch(e){}
 function saveCfg(){try{localStorage.setItem('gdlab-cfg',JSON.stringify(cfg));}catch(e){}}
 const NOTES={
- size:{'3':'今と同じ 3×3。','4':'4×4 で固定。','5':'5×5 で固定。','grow':'3×3 から始まり、30 秒で 4×4、60 秒で 5×5 に区画が広がる。'},
+ size:{'3':'今と同じ 3×3。','4':'4×4 で固定。','5':'5×5 で固定。','grow':'3×3 から始まり、24 秒で 4×4、48 秒で 5×5 に区画が広がる。'},
  ctrl:{drag:'画面のどこでもフリック。1回のフリックで動くのは1マスだけで、次は指を離してから。両手の指で交互にフリックしてもよい。',tap:'行きたいマスをタップ。1マスずつ滑って動く（途中のマスでも当たる）。'},
- mode:{phase:'15 秒ごとに新しい障害が1つ加わる。90 秒からは全部が混ざる。',pick:'選んだ障害だけが出る。難しさは時間で上がる。'}
+ mode:{phase:'12 秒ごとに新しい障害が1つ加わる。72 秒からは全部が混ざる。',pick:'選んだ障害だけが出る。難しさは時間で上がる。'}
 };
 function renderCfg(){
   document.querySelectorAll('.seg').forEach(seg=>{const k=seg.dataset.k; seg.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(cfg[k]===b.dataset.v)));});
   $('#sizeNote').textContent=NOTES.size[cfg.size]; $('#ctrlNote').textContent=NOTES.ctrl[cfg.ctrl]; $('#modeNote').textContent=NOTES.mode[cfg.mode];
   $('#chips').hidden=cfg.mode!=='pick';
   $('#chips').querySelectorAll('.chip').forEach(c=>c.setAttribute('aria-pressed',String(!!cfg.types[c.dataset.t])));
-  $('#foot').textContent=(cfg.ctrl==='drag'?'A フリック：1回で1マス、次は指を離してから':'B タップ：行きたいマスをタップ')+'　／　キーは矢印・WASD　（試作 v3）';
+  $('#foot').textContent=(cfg.ctrl==='drag'?'A フリック：1回で1マス、次は指を離してから':'B タップ：行きたいマスをタップ')+'　／　キーは矢印・WASD　（試作 v4）';
   updateBest();
 }
 document.querySelectorAll('.seg').forEach(seg=>seg.addEventListener('click',e=>{const b=e.target.closest('button'); if(!b)return; cfg[seg.dataset.k]=b.dataset.v; saveCfg(); renderCfg();}));
@@ -181,13 +181,13 @@ function startGame(){
   if(!AC){try{AC=new (window.AudioContext||window.webkitAudioContext)();}catch(e){}} else if(AC.state==='suspended')AC.resume();
   N=cfg.size==='grow'?3:+cfg.size; layout();
   const m=Math.floor(N/2);
-  G={T:0,alive:true,px:m,py:m,vx:m,vy:m,hz:[],nextSpawn:1.1,noSpawnUntil:0,phase:-1,path:[],stepT:0,shake:0,flash:0,bump:null,expand:0,dieT:0,cause:null,gid:0};
+  G={T:0,alive:true,px:m,py:m,vx:m,vy:m,hz:[],nextSpawn:.8,noSpawnUntil:0,phase:-1,path:[],stepT:0,shake:0,flash:0,bump:null,expand:0,dieT:0,cause:null,gid:0};
   bannerQ.length=0; bannerT=0; $('#ov').hidden=true; beep(660,.12,'sine',.05,990);
 }
-function diff(){return clamp(G.T/110);}
-function warnTime(){return lerp(1.15,.55,diff());}
+function diff(){return clamp(.2+G.T/75);}
+function warnTime(){return lerp(1.0,.5,diff());}
 function allowed(){
-  if(cfg.mode==='phase'){const k=Math.min(6,Math.floor(G.T/15)); return TYPES.slice(0,Math.min(6,k+1)).map(t=>t.id);}
+  if(cfg.mode==='phase'){const k=Math.min(6,Math.floor(G.T/12)); return TYPES.slice(0,Math.min(6,k+1)).map(t=>t.id);}
   return TYPES.filter(t=>cfg.types[t.id]).map(t=>t.id);
 }
 const has=(h,x,y)=>h.cells.some(c=>c[0]===x&&c[1]===y);
@@ -255,13 +255,13 @@ function spawn(){
   const T=G.T,d=diff();
   if(T<G.nextSpawn||T<G.noSpawnUntil)return;
   const live=new Set(G.hz.filter(h=>h.te>T).map(h=>h.gid)).size;
-  const maxC=d<.22?1:d<.6?2:3;
+  const maxC=d<.3?1:d<.6?2:3;
   if(live>=maxC){G.nextSpawn=T+.15;return;}
   const al=allowed(); let type;
-  if(cfg.mode==='phase'&&G.T<90&&al.length>1&&Math.random()<.45) type=al[al.length-1]; else type=al[ri(al.length)];
+  if(cfg.mode==='phase'&&G.T<72&&al.length>1&&Math.random()<.45) type=al[al.length-1]; else type=al[ri(al.length)];
   for(let i=0;i<10;i++){const c=build(type); if(fair(c)){G.hz.push(...c); beep(type==='drone'?880:330,.08,'sine',.03); break;}}
   const extra=(type==='sweep'||type==='pulse')?.7:0;
-  G.nextSpawn=T+lerp(1.45,.6,d)*(.8+Math.random()*.4)+extra;
+  G.nextSpawn=T+lerp(1.2,.55,d)*(.8+Math.random()*.4)+extra;
 }
 
 // ---- 知らせ ----
@@ -278,8 +278,8 @@ function update(dt){
   if(!G)return;
   if(!G.alive){G.dieT+=dt; return;}
   G.T+=dt; const T=G.T;
-  if(cfg.size==='grow'){const want=T<30?3:T<60?4:5; if(want!==N)expand(want);}
-  if(cfg.mode==='phase'){const ph=Math.min(6,Math.floor(T/15)); if(ph!==G.phase){G.phase=ph; const t=TYPES[ph];
+  if(cfg.size==='grow'){const want=T<24?3:T<48?4:5; if(want!==N)expand(want);}
+  if(cfg.mode==='phase'){const ph=Math.min(6,Math.floor(T/12)); if(ph!==G.phase){G.phase=ph; const t=TYPES[ph];
     if(ph<6)banner((ph===0?'試験 1：':'新しい試験：')+t.name,t.desc); else banner('総合試験','すべての障害が混ざる');}}
   // タップの道のり
   if(G.path.length&&T>=G.stepT){const [x,y]=G.path[0]; if(tryMove(x-G.px,y-G.py)){G.path.shift(); G.stepT=T+.07;} else G.path=[];}
