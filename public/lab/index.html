@@ -9,7 +9,7 @@
 <style>
 /* 1画面のゲーム：上に計器、真ん中に試験区画、下に操作の説明。暗い実験場で決め打ち（片方のテーマだけ） */
 :root{
-  --bg:#06090f; --ink:#d8ecf5; --dim:#6f8fa3; --accent:#4fd8ff; --panel:#0b121c; --edge:#1d3242; --exit:#7dffd8;
+  --bg:#06090f; --ink:#d8ecf5; --dim:#6f8fa3; --accent:#4fd8ff; --panel:#0b121c; --edge:#1d3242; --exit:#7dffd8; --b2:#f4f1ff;
   --f-num:"Chakra Petch","Segoe UI",system-ui,sans-serif;
   --f-jp:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic",system-ui,sans-serif;
   color-scheme:dark;
@@ -31,7 +31,7 @@ body{background:var(--bg);color:var(--ink);font:14px var(--f-jp);overflow:hidden
 #time{font-family:var(--f-num);font-weight:700;font-size:30px;font-variant-numeric:tabular-nums;line-height:1}
 #time.open{color:var(--exit)}
 #hud .r{min-width:0;justify-self:end;display:flex;flex-direction:column;align-items:flex-end;gap:4px}
-#shields{font-size:12px;color:var(--accent);min-height:1em;white-space:nowrap}
+#modeTag{font-size:12px;color:var(--accent);white-space:nowrap}
 .icon{background:none;border:1px solid var(--edge);color:var(--dim);border-radius:6px;font:12px var(--f-jp);padding:4px 8px;cursor:pointer}
 button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 #stage{flex:1;position:relative;min-height:0}
@@ -44,26 +44,21 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 #foot{font-size:12px;color:var(--dim);text-align:center;padding-block:4px 12px;min-height:2.6em}
 .ov{position:fixed;inset:0;background:rgba(4,7,12,.84);display:flex;align-items:flex-start;justify-content:center;overflow:auto;
   padding:max(24px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) 24px max(16px,env(safe-area-inset-left,0px))}
-.card{width:100%;max-width:440px;background:var(--panel);border:1px solid var(--edge);border-radius:10px;padding:20px 18px;display:flex;flex-direction:column;gap:16px;margin-block:auto}
+.card{width:100%;max-width:440px;background:var(--panel);border:1px solid var(--edge);border-radius:10px;padding:20px 18px;display:flex;flex-direction:column;gap:14px;margin-block:auto}
 h1{margin:0;font-family:var(--f-num);font-size:30px;letter-spacing:.04em;line-height:1}
 h1 span{color:var(--accent)}
-h2{margin:0;font-size:18px}
 .lead{margin:6px 0 0;font-size:13px;color:var(--dim);line-height:1.7}
-ol.flow{margin:0;padding-left:1.3em;font-size:13px;line-height:1.8}
 #result{border:1px solid var(--edge);border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:4px}
-#result .big{font-family:var(--f-num);font-size:30px;font-weight:700;font-variant-numeric:tabular-nums}
+#result .big{font-family:var(--f-num);font-size:28px;font-weight:700;font-variant-numeric:tabular-nums}
 #result .sub{font-size:12px;color:var(--dim);line-height:1.6}
-.go{background:var(--accent);color:#04121a;border:0;border-radius:8px;padding:14px;font:700 16px var(--f-jp);cursor:pointer}
+.modeBtn{text-align:left;background:#0f1a26;color:var(--ink);border:1px solid var(--edge);border-left:3px solid var(--accent);border-radius:8px;padding:12px 14px;cursor:pointer;display:flex;flex-direction:column;gap:4px;font-family:var(--f-jp)}
+.modeBtn b{font-size:16px}
+.modeBtn span{font-size:12px;color:var(--dim);line-height:1.6}
+.modeBtn small{font-family:var(--f-num);font-size:11px;color:var(--accent)}
+.modeBtn:active{border-color:var(--accent)}
 details{font-size:12px;color:var(--dim)}
 details summary{cursor:pointer}
 details ul{margin:6px 0 0;padding-left:1.2em;line-height:1.7}
-.note{font-size:12px;color:var(--dim);line-height:1.6;margin:0}
-#mods{display:flex;flex-direction:column;gap:10px}
-.mod{text-align:left;background:#0f1a26;color:var(--ink);border:1px solid var(--edge);border-radius:8px;padding:12px 14px;cursor:pointer;display:flex;flex-direction:column;gap:4px;font-family:var(--f-jp)}
-.mod b{font-size:15px}
-.mod span{font-size:12px;color:var(--dim);line-height:1.5}
-.mod small{font-family:var(--f-num);font-size:11px;color:var(--accent)}
-.mod:active{border-color:var(--accent)}
 @media (prefers-reduced-motion:reduce){#banner div{transition:none}}
 </style>
 </head>
@@ -71,40 +66,28 @@ details ul{margin:6px 0 0;padding-left:1.2em;line-height:1.7}
 <div id="app">
   <div id="hud">
     <div class="l"><div id="room">区画 —</div><div id="shape">待機中</div></div>
-    <div id="mid"><div id="midLabel">出口が開くまで</div><div id="time">—</div></div>
-    <div class="r"><div id="shields"></div><button class="icon" id="mute" aria-label="音の入り切り">音 入</button></div>
+    <div id="mid"><div id="midLabel">—</div><div id="time">—</div></div>
+    <div class="r"><div id="modeTag"></div><button class="icon" id="mute" aria-label="音の入り切り">音 入</button></div>
   </div>
   <div id="stage"><canvas id="cv"></canvas><div id="banner"><div class="off"><b></b><span></span></div></div></div>
-  <div id="foot">フリックで1マス（指を離して次へ・両手で可）　／　キーは矢印・WASD　（試作 v6）</div>
+  <div id="foot">（試作 v7）</div>
 </div>
 
 <div class="ov" id="ovStart">
   <div class="card">
     <div id="result" hidden>
-      <div class="sub">ラン終了</div>
+      <div class="sub" id="rHead">ラン終了</div>
       <div class="big" id="rMain"></div>
       <div class="sub" id="rSub"></div>
     </div>
     <div>
       <h1>GRID DODGE <span>LAB</span></h1>
-      <p class="lead">被験体のロボットとして、試験区画を1つずつ抜けていく。</p>
+      <p class="lead">被験体のロボットで、試験区画を1つずつ抜けていく。区画の形は毎回ちがう。当たったら最初から。</p>
     </div>
-    <ol class="flow">
-      <li>区画の中で、壁の装置が撃つ試験を避ける</li>
-      <li>しばらく生き延びると<b style="color:var(--exit)">出口</b>が開く。そこまで行けば突破</li>
-      <li>次の区画の前に、装備を3つから1つ選ぶ</li>
-      <li>奥ほど区画が広く（最大 8×8）、形も試験も変わる。当たったら最初から</li>
-    </ol>
+    <button class="modeBtn" data-mode="duo"><small>案 1</small><b>二体同時の試験</b><span>ロボットが2体。画面の左半分のフリックで L、右半分で R が動く（キーは WASD と矢印）。しばらく生き延びると出口が2つ開き、L と R がそれぞれの出口に同時に乗れば突破。</span></button>
+    <button class="modeBtn" data-mode="paint"><small>案 3</small><b>逃げながら塗る</b><span>通ったマスが自分の色に塗られる。床の 70% を塗れば突破。撃たれた床は色が消えるので、止まっていても進まない。</span></button>
     <details><summary>障害と柱の見分け方</summary><ul id="legend"></ul></details>
-    <button class="go" id="go">ランを始める</button>
-    <p class="note" id="bestNote"></p>
-  </div>
-</div>
-
-<div class="ov" id="ovPick" hidden>
-  <div class="card">
-    <div><h2 id="pickTitle">区画 1 を突破</h2><p class="lead">次の区画へ持っていく装備を1つ選ぶ。</p></div>
-    <div id="mods"></div>
+    <p class="lead" id="bestNote"></p>
   </div>
 </div>
 
@@ -116,27 +99,24 @@ const TYPES=[
  {id:'beam',  name:'持続ビーム',   color:'#b57bff', desc:'1列を数秒ふさぐ。その間は入れない。柱で止まる'},
  {id:'panel', name:'封鎖パネル',   color:'#ff9440', desc:'角の枠が閉じると床が熱くなり、数秒入れない'},
  {id:'sweep', name:'掃引レーザー', color:'#ff4d6d', desc:'番号の順に1列ずつ撃つ。撃ち終わった列へ逃げる'},
- {id:'drone', name:'照準ドローン', color:'#ffd43b', desc:'照準が自分を追い、止まってから撃つ。止まったら外す'},
+ {id:'drone', name:'照準ドローン', color:'#ffd43b', desc:'照準がロボットを追い、止まってから撃つ。止まったら外す'},
  {id:'pulse', name:'パルス',       color:'#7dff9a', desc:'中心から輪が外へ広がる。撃ち終わった内側へ戻る'},
 ];
 const TMAP=Object.fromEntries(TYPES.map(t=>[t.id,t]));
-const MODS=[
- {id:'shield',name:'防護シールド',desc:'1回だけ当たっても耐える。重ねて持てる'},
- {id:'eye',   name:'予測センサー',desc:'予告が 15% 長く見える'},
- {id:'dodge', name:'緊急回避',    desc:'当たる瞬間、隣の安全なマスへ自動で逃げる（区画ごとに1回）'},
- {id:'key',   name:'出口の解析',  desc:'出口が開くまでの時間が 25% 短い'},
- {id:'cool',  name:'冷却装置',    desc:'持続ビームと封鎖パネルが 40% 早く消える'},
- {id:'armor', name:'重装甲',      desc:'シールドを2つ得る。ただし予告が 10% 短くなる'},
-];
-const MMAP=Object.fromEntries(MODS.map(m=>[m.id,m]));
+const MODES={duo:{name:'二体同時',foot:'左半分のフリックで L、右半分で R（指を離して次へ）／ キーは WASD と矢印'},
+             paint:{name:'逃げながら塗る',foot:'フリックで1マス（指を離して次へ・両手で可）／ キーは矢印・WASD'}};
+const BOTC=['#4fd8ff','#f4f1ff'], BOTN=['L','R'];
 const $=s=>document.querySelector(s);
 const cv=$('#cv'),ctx=cv.getContext('2d'),stage=$('#stage');
 $('#legend').innerHTML=TYPES.map(t=>`<li><b style="color:${t.color}">${t.name}</b>：${t.desc}</li>`).join('')+
-  '<li><b style="color:#9fb8c8">柱</b>：入れない。レーザー・球・ビームを止めるので、陰に隠れられる</li><li><b style="color:var(--exit)">出口</b>：開いたらそこへ行くと区画を突破</li>';
+  '<li><b style="color:#9fb8c8">柱</b>：入れない。レーザー・球・ビームを止めるので、陰に隠れられる</li>';
 
-function getBest(){try{return +localStorage.getItem('gdlab-run-best')||0;}catch(e){return 0;}}
-function setBest(v){try{localStorage.setItem('gdlab-run-best',String(v));}catch(e){}}
-function showBest(){const b=getBest(); $('#bestNote').textContent=b?'これまでの最高：区画 '+b+' まで突破':'';}
+let MODE='duo';
+const bestKey=m=>'gdlab-best-'+m;
+function getBest(m){try{return +localStorage.getItem(bestKey(m))||0;}catch(e){return 0;}}
+function setBest(m,v){try{localStorage.setItem(bestKey(m),String(v));}catch(e){}}
+function showBest(){const a=getBest('duo'),b=getBest('paint');
+  $('#bestNote').textContent=(a||b)?'これまでの最高：二体同時 区画 '+a+'　／　塗る 区画 '+b+'（突破した数）':'';}
 showBest();
 
 // ---- 音 ----
@@ -156,85 +136,83 @@ const cx=x=>BX+x*(CS+GAP), cy=y=>BY+y*(CS+GAP);
 const clamp=(v,a=0,b=1)=>Math.max(a,Math.min(b,v));
 const lerp=(a,b,t)=>a+(b-a)*t;
 const ri=n=>Math.floor(Math.random()*n);
-const shuffle=a=>{for(let i=a.length-1;i>0;i--){const j=ri(i+1);[a[i],a[j]]=[a[j],a[i]];}return a;};
+const D4=[[1,0],[-1,0],[0,1],[0,-1]];
 
 // ---- 区画の形 ----
-// 0=穴（床が無い） 1=床 2=柱
+// 0=穴（床が無い） 1=床 2=柱。型は使わず毎回ランダムに育て、行き止まり（床の隣が1つ以下）を削る
 let M=[];
 const at=(x,y)=>(x>=0&&y>=0&&x<N&&y<N)?M[y*N+x]:0;
 const walk=(x,y)=>at(x,y)===1;
 function floors(){const a=[];for(let y=0;y<N;y++)for(let x=0;x<N;x++)if(M[y*N+x]===1)a.push([x,y]);return a;}
 function connected(m,n){let start=-1,cnt=0;for(let i=0;i<m.length;i++)if(m[i]===1){cnt++;if(start<0)start=i;}
   if(start<0)return false; const seen=new Set([start]),q=[start];
-  while(q.length){const i=q.pop(),x=i%n,y=(i/n)|0; for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){const nx=x+dx,ny=y+dy,j=ny*n+nx;
+  while(q.length){const i=q.pop(),x=i%n,y=(i/n)|0; for(const [dx,dy] of D4){const nx=x+dx,ny=y+dy,j=ny*n+nx;
     if(nx>=0&&ny>=0&&nx<n&&ny<n&&m[j]===1&&!seen.has(j)){seen.add(j);q.push(j);}}}
   return seen.size===cnt;}
-const SHAPES=[
- {name:'正方形', ok:n=>true, f:(x,y,n)=>1},
- {name:'十字', ok:n=>n>=4, f:(x,y,n)=>{const b=Math.ceil(n/2),lo=Math.floor((n-b)/2);return (x>=lo&&x<lo+b)||(y>=lo&&y<lo+b)?1:0;}},
- {name:'輪', ok:n=>n>=5, f:(x,y,n)=>{const c=n-4,lo=2;return (x>=lo&&x<lo+c&&y>=lo&&y<lo+c)?0:1;}},
- {name:'L字', ok:n=>n>=4, f:(x,y,n)=>{const h=Math.ceil(n/2);return (x>=h&&y<n-h)?0:1;}},
- {name:'2つの部屋', ok:n=>n>=5, f:(x,y,n)=>{const a=Math.ceil(n*.4),m=Math.floor(n/2);return (x<a||x>=n-a||y===m)?1:0;}},
- {name:'H字', ok:n=>n>=5, f:(x,y,n)=>{const a=Math.max(1,Math.floor(n/3)),m=Math.floor(n/2);return (x<a||x>=n-a||y===m||y===m-1+(n%2))?1:0;}},
- {name:'不定形', ok:n=>true, f:null},
-];
+function nb(m,n,i){const x=i%n,y=(i/n)|0;let c=0;for(const [dx,dy] of D4){const nx=x+dx,ny=y+dy;if(nx>=0&&ny>=0&&nx<n&&ny<n&&m[ny*n+nx]===1)c++;}return c;}
 function genRoom(k){
   const n=Math.min(8,3+k);
-  for(let tries=0;tries<200;tries++){
-    const pool=SHAPES.filter(s=>s.ok(n)&&(k>1||s.name!=='不定形')); const sh=k===1?SHAPES[0]:pool[ri(pool.length)];
+  for(let tries=0;tries<400;tries++){
     let m=new Array(n*n).fill(0);
-    if(sh.f){for(let y=0;y<n;y++)for(let x=0;x<n;x++)m[y*n+x]=sh.f(x,y,n);}
-    else{const goal=Math.round(n*n*lerp(.6,.75,Math.random())); const c=Math.floor(n/2); m[c*n+c]=1; let cnt=1;
-      while(cnt<goal){const fl=[];for(let i=0;i<m.length;i++)if(m[i]===1)fl.push(i); const i=fl[ri(fl.length)],x=i%n,y=(i/n)|0;
-        const [dx,dy]=[[1,0],[-1,0],[0,1],[0,-1]][ri(4)],nx=x+dx,ny=y+dy; if(nx>=0&&ny>=0&&nx<n&&ny<n&&!m[ny*n+nx]){m[ny*n+nx]=1;cnt++;}}}
-    // 穴を少し空ける
-    const holes=k===1?0:ri(Math.floor(n*n*.07)+1);
-    for(let h=0,g=0;h<holes&&g<50;g++){const i=ri(n*n); if(m[i]!==1)continue; m[i]=0; if(!connected(m,n))m[i]=1; else h++;}
-    // 柱
-    const pil=k===1?0:Math.min(5,ri(Math.floor(n/2))+(n>=6?1:0));
-    for(let p=0,g=0;p<pil&&g<60;g++){const i=ri(n*n),x=i%n,y=(i/n)|0; if(m[i]!==1||x===0||y===0||x===n-1||y===n-1)continue;
-      m[i]=2; if(!connected(m,n))m[i]=1; else p++;}
+    if(k===1)m.fill(1);
+    else{
+      const goal=Math.round(n*n*lerp(.5,.85,Math.random())), seeds=1+ri(3); let cnt=0;
+      for(let s=0;s<seeds;s++){const i=ri(n*n); if(!m[i]){m[i]=1;cnt++;}}
+      for(let g=0;cnt<goal&&g<6000;g++){const fl=[];for(let i=0;i<m.length;i++)if(m[i]===1)fl.push(i);
+        const i=fl[ri(fl.length)],x=i%n,y=(i/n)|0,[dx,dy]=D4[ri(4)],nx=x+dx,ny=y+dy;
+        if(nx>=0&&ny>=0&&nx<n&&ny<n&&!m[ny*n+nx]){m[ny*n+nx]=1;cnt++;}}
+      const pil=ri(Math.floor(n/2)+1);
+      for(let p=0,g=0;p<pil&&g<60;g++){const i=ri(n*n); if(m[i]===1&&nb(m,n,i)>=3){m[i]=2;p++;}}
+    }
+    for(let ch=true;ch;){ch=false; for(let i=0;i<m.length;i++)if(m[i]===1&&nb(m,n,i)<2){m[i]=0;ch=true;}}
     const fc=m.filter(v=>v===1).length;
-    if(fc>=Math.max(8,n*n*.45)&&connected(m,n))return {n,m,name:sh.name};
+    if(fc>=Math.max(9,n*n*.4)&&connected(m,n))return {n,m};
   }
-  return {n,m:new Array(n*n).fill(1),name:'正方形'};
+  return {n,m:new Array(n*n).fill(1)};
 }
 
 // ---- 状態 ----
 let G=null;
-const mods=()=>G.mods;
-const cnt=id=>G.mods[id]||0;
-function startRun(){
+function startRun(mode){
+  if(mode)MODE=mode;
   if(!AC){try{AC=new (window.AudioContext||window.webkitAudioContext)();}catch(e){}} else if(AC.state==='suspended')AC.resume();
-  G={room:0,mods:{},shields:0,totalT:0,alive:true,state:'play',T:0,hz:[],gid:0,shake:0,flash:0,bump:null,inv:0,cause:null};
-  $('#ovStart').hidden=true; $('#ovPick').hidden=true; $('#result').hidden=false; enterRoom(1);
+  G={room:0,totalT:0,state:'play',T:0,hz:[],gid:0,shake:0,flash:0,cause:null,erased:[]};
+  $('#ovStart').hidden=true; $('#result').hidden=false; $('#foot').textContent=MODES[MODE].foot+'　（試作 v7）';
+  $('#modeTag').textContent=MODES[MODE].name; enterRoom(1);
 }
+function nearest(fl,tx,ty,not){let best=null,bd=1e9;for(const f of fl){if(not&&f[0]===not[0]&&f[1]===not[1])continue;
+  const d=Math.abs(f[0]-tx)+Math.abs(f[1]-ty)+Math.random()*.1; if(d<bd){bd=d;best=f;}}return best;}
 function enterRoom(k){
   const r=genRoom(k); N=r.n; M=r.m; layout();
-  const fl=floors(), c=(N-1)/2; fl.sort((a,b)=>(Math.abs(a[0]-c)+Math.abs(a[1]-c))-(Math.abs(b[0]-c)+Math.abs(b[1]-c)));
-  Object.assign(G,{room:k,shapeName:r.name,state:'play',T:0,hz:[],px:fl[0][0],py:fl[0][1],vx:fl[0][0],vy:fl[0][1],
-    exit:null,exitAt:Math.min(22,12+k*1.5)*Math.pow(.75,cnt('key')),nextSpawn:.9,dodges:cnt('dodge'),inv:0,enter:1});
+  const fl=floors(), c=(N-1)/2, bots=[];
+  if(MODE==='duo'){const a=nearest(fl,c-1.5,c), b=nearest(fl,c+1.5,c,a); bots.push(mk(a),mk(b));}
+  else bots.push(mk(nearest(fl,c,c)));
+  function mk(p){return {x:p[0],y:p[1],vx:p[0],vy:p[1],bump:null};}
+  Object.assign(G,{room:k,state:'play',T:0,hz:[],bots,exits:null,exitAt:Math.min(20,11+k*1.5),nextSpawn:.9,enter:1,erased:[]});
+  if(MODE==='paint'){G.paint=new Set([bots[0].x+','+bots[0].y]); G.goal=Math.ceil(fl.length*.7);}
   bannerQ.length=0; bannerT=0;
+  if(MODE==='duo')banner('区画 '+k+'：'+N+'×'+N,'左手で L、右手で R。出口が開いたら、それぞれの出口へ');
+  else banner('区画 '+k+'：'+N+'×'+N,'床の 70%（'+G.goal+' マス）を塗れば突破。撃たれた床は消える');
   const t=TYPES[Math.min(TYPES.length-1,k)];
-  if(k===1)banner('区画 1：'+N+'×'+N,'レーザーとエネルギー球。出口が開くまで生き延びる');
-  else if(k<TYPES.length)banner('区画 '+k+'：新しい試験 '+t.name,t.desc);
-  else banner('区画 '+k+'：'+r.name+' '+N+'×'+N,'すべての試験が混ざる');
+  if(k>1&&k<TYPES.length)banner('新しい試験：'+t.name,t.desc);
   beep(330,.3,'sine',.05,880);
 }
-function diff(){return clamp(.12+(G.room-1)*.1+G.T/45);}
-function warnMul(){return Math.pow(1.15,cnt('eye'))*Math.pow(.9,cnt('armor'));}
-function warnTime(){return lerp(1.0,.5,diff())*warnMul();}
+function diff(){return clamp((MODE==='duo'?.08:.12)+(G.room-1)*(MODE==='duo'?.08:.1)+G.T/45);}
+function warnTime(){return lerp(1.0,.5,diff())*(MODE==='duo'?1.15:1);}
 function allowed(){return TYPES.slice(0,Math.min(TYPES.length,G.room+1)).map(t=>t.id);}
 function active(h,t){return t>=h.tf&&t<h.te;}
 const has=(cells,x,y)=>cells.some(c=>c[0]===x&&c[1]===y);
 function blockedAt(x,y,t){return G.hz.some(h=>h.blocks&&active(h,t)&&has(h.cells,x,y));}
 function canEnter(x,y,t){return walk(x,y)&&!blockedAt(x,y,t);}
 
-function tryMove(dx,dy){
+function tryMove(bi,dx,dy){
   if(!G||G.state!=='play')return false;
-  const nx=G.px+dx,ny=G.py+dy;
-  if(!canEnter(nx,ny,G.T)){G.bump={dx,dy,t:G.T}; beep(140,.06,'square',.025); return false;}
-  G.px=nx;G.py=ny; beep(520+ri(60),.04,'triangle',.03); return true;
+  const b=G.bots[bi]; if(!b)return false;
+  const nx=b.x+dx,ny=b.y+dy, other=G.bots.find((o,i)=>i!==bi&&o.x===nx&&o.y===ny);
+  if(!canEnter(nx,ny,G.T)||other){b.bump={dx,dy,t:G.T}; beep(140,.06,'square',.025); return false;}
+  b.x=nx;b.y=ny; beep(bi?600:520+ri(60),.04,'triangle',.03);
+  if(MODE==='paint'){const k=nx+','+ny; if(!G.paint.has(k)){G.paint.add(k); beep(760+G.paint.size*8,.05,'sine',.025);}}
+  return true;
 }
 
 // ---- 障害 ----
@@ -243,22 +221,23 @@ function travel(axis,idx,side){const p=[];let stop=false;
   for(let i=0;i<N;i++){const j=side?N-1-i:i, c=axis==='row'?[j,idx]:[idx,j]; if(at(c[0],c[1])===2){stop=true;break;} p.push(c);}
   return {path:p,stop};}
 function lineOk(axis,idx,side){return travel(axis,idx,side).path.some(c=>walk(c[0],c[1]));}
-function pickLine(){
-  for(let g=0;g<20;g++){const axis=Math.random()<.5?'row':'col', side=ri(2), aim=axis==='row'?G.py:G.px, idx=Math.random()<.65?aim:ri(N);
-    if(lineOk(axis,idx,side))return {axis,idx,side};}
+// aim のとき、狙うロボットの行か列を必ず通る線にする
+function pickLine(b,aim){
+  for(let g=0;g<20;g++){const axis=Math.random()<.5?'row':'col', side=ri(2), idx=aim?(axis==='row'?b.y:b.x):ri(N);
+    if(lineOk(axis,idx,side)&&(!aim||has(travel(axis,idx,side).path,b.x,b.y)))return {axis,idx,side};}
   return null;}
 function mkLine(type,L,t0,tf,dur,extra){const tr=travel(L.axis,L.idx,L.side);
   return Object.assign({type,axis:L.axis,idx:L.idx,side:L.side,path:tr.path,stop:tr.stop,cells:tr.path.filter(c=>walk(c[0],c[1])),t0,tf,te:tf+dur,blocks:type==='beam'},extra||{});}
 function randFloor(){const f=floors();return f[ri(f.length)];}
-function build(type){
-  const T=G.T,w=warnTime(),d=diff(),gid=++G.gid,cool=Math.pow(.6,cnt('cool'));
-  if(type==='laser'){const L=pickLine(); return L&&[mkLine('laser',L,T,T+w,.16,{gid})];}
-  if(type==='orb'){const L=pickLine(); if(!L)return null; const per=lerp(.62,.34,d), tf=T+w*.9; const h=mkLine('orb',L,T,tf,0,{gid,per,blocks:false}); h.te=tf+(h.path.length+.7)*per; h.cells=[]; return [h];}
-  if(type==='beam'){const L=pickLine(); return L&&[mkLine('beam',L,T,T+w*1.1,(2.3+Math.random()*1.1)*cool,{gid})];}
+function build(type,bi,aim){
+  const T=G.T,w=warnTime(),d=diff(),gid=++G.gid,b=G.bots[bi];
+  if(type==='laser'){const L=pickLine(b,aim); return L&&[mkLine('laser',L,T,T+w,.16,{gid})];}
+  if(type==='orb'){const L=pickLine(b,aim); if(!L)return null; const per=lerp(.62,.34,d), tf=T+w*.9; const h=mkLine('orb',L,T,tf,0,{gid,per,blocks:false}); h.te=tf+(h.path.length+.7)*per; h.cells=[]; return [h];}
+  if(type==='beam'){const L=pickLine(b,aim); return L&&[mkLine('beam',L,T,T+w*1.1,2.3+Math.random()*1.1,{gid})];}
   if(type==='panel'){
-    const cells=[Math.random()<.6?[G.px,G.py]:randFloor()]; const k=N>=5&&d>.35?2:1;
+    const cells=[aim?[b.x,b.y]:randFloor()]; const k=N>=5&&d>.35?2:1;
     for(let g=0;cells.length<k&&g<20;g++){const c=randFloor(); if(!has(cells,c[0],c[1]))cells.push(c);}
-    return [{type:'panel',cells,t0:T,tf:T+w*1.05,te:T+w*1.05+(2.4+Math.random())*cool,blocks:true,gid}];
+    return [{type:'panel',cells,t0:T,tf:T+w*1.05,te:T+w*1.05+2.4+Math.random(),blocks:true,gid}];
   }
   if(type==='sweep'){
     const axis=Math.random()<.5?'row':'col', dir=ri(2)?1:-1, side=ri(2), iv=lerp(.5,.34,d), out=[]; let o=0;
@@ -266,9 +245,9 @@ function build(type){
     return out.length?out:null;
   }
   if(type==='drone'){const tl=T+.95, tf=tl+Math.max(.36,w*.6);
-    return [{type:'drone',cells:[[G.px,G.py]],t0:T,tl,tf,te:tf+.16,rx:cx(G.px)+CS/2,ry:cy(G.py)+CS/2,gid}];}
+    return [{type:'drone',bot:bi,cells:[[b.x,b.y]],t0:T,tl,tf,te:tf+.16,rx:cx(b.x)+CS/2,ry:cy(b.y)+CS/2,gid}];}
   if(type==='pulse'){
-    const c=Math.random()<.6?[G.px,G.py]:randFloor(), out=[];
+    const c=aim?[b.x,b.y]:randFloor(), out=[];
     for(let r=0;r<N;r++){const cells=[];for(const f of floors())if(Math.max(Math.abs(f[0]-c[0]),Math.abs(f[1]-c[1]))===r)cells.push(f);
       if(cells.length) out.push({type:'pulse',cells,r,center:c,t0:T,tf:T+w+r*.3,te:T+w+r*.3+.15,blocks:false,gid});}
     return out;
@@ -278,17 +257,18 @@ function orbU(h,t){return (t-h.tf)/h.per-.6;}
 function orbCell(h,t){const k=Math.round(orbU(h,t)); if(k<0||k>=h.path.length)return null; const c=h.path[k]; return walk(c[0],c[1])?c:null;}
 function cellsAt(h,t){if(h.type!=='orb')return h.cells; const c=orbCell(h,t); return c?[c]:[];}
 function dangerSet(list,t){const s=new Set();for(const h of list)if(active(h,t))for(const c of cellsAt(h,t))s.add(c[0]+','+c[1]);return s;}
+// どのロボットも、撃たれる前に安全なマスへ行けるときだけ出す
 function fair(cands){
-  const all=G.hz.concat(cands), needBlock=cands.some(c=>c.blocks), fc=floors().length;
+  const all=G.hz.concat(cands), needBlock=cands.some(c=>c.blocks), fc=floors().length, nb=G.bots.length;
   const times=[]; for(const c of cands){times.push(c.tf+.02); if(c.blocks)times.push((c.tf+c.te)/2,c.te-.03); if(c.type==='orb')for(let k=0;k<c.path.length;k++)times.push(c.tf+c.per*(k+.6));}
-  for(const t of times){const ds=dangerSet(all,t); if(fc-ds.size<(needBlock?3:2))return false;}
-  for(const c of cands){
-    const steps=Math.max(1,Math.floor((c.tf-G.T)/.17));
+  for(const t of times){const ds=dangerSet(all,t); if(fc-ds.size<(needBlock?2:1)+nb)return false;}
+  for(const c of cands)for(const b of G.bots){
+    const steps=Math.max(1,Math.floor((c.tf-G.T)/(nb>1?.24:.17)));
     const ds=dangerSet(all,c.tf+.02), ds2=dangerSet(all,c.tf+.12);
-    const seen=new Set([G.px+','+G.py]); let q=[[G.px,G.py]], ok=false;
+    const seen=new Set([b.x+','+b.y]); let q=[[b.x,b.y]], ok=false;
     for(let s=0;s<=steps&&q.length&&!ok;s++){const nq=[];
       for(const [x,y] of q){const k=x+','+y; if(!ds.has(k)&&!ds2.has(k)){ok=true;break;}
-        for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){const nx=x+dx,ny=y+dy,nk=nx+','+ny; if(canEnter(nx,ny,G.T)&&!seen.has(nk)){seen.add(nk);nq.push([nx,ny]);}}}
+        for(const [dx,dy] of D4){const nx=x+dx,ny=y+dy,nk=nx+','+ny; if(canEnter(nx,ny,G.T)&&!seen.has(nk)){seen.add(nk);nq.push([nx,ny]);}}}
       q=nq;}
     if(!ok)return false;
   }
@@ -301,7 +281,10 @@ function spawn(){
   const maxC=(d<.3?1:d<.6?2:3)+(N>=7?1:0);
   if(live>=maxC){G.nextSpawn=T+.15;return;}
   const al=allowed(); let type=(G.room<TYPES.length&&Math.random()<.4)?al[al.length-1]:al[ri(al.length)];
-  for(let i=0;i<10;i++){const c=build(type); if(c&&c.length&&fair(c)){G.hz.push(...c); beep(type==='drone'?880:330,.08,'sine',.03); break;}}
+  const bi=ri(G.bots.length); let placed=false;
+  // まず狙って出す。無理なら狙わずに出す。どちらも無理なら少し待って出し直す（飛ばさない）
+  for(let i=0;i<14&&!placed;i++){const c=build(type,bi,i<9); if(c&&c.length&&fair(c)){G.hz.push(...c); placed=true; beep(type==='drone'?880:330,.08,'sine',.03);}}
+  if(!placed){G.nextSpawn=T+.2;return;}
   G.nextSpawn=T+lerp(1.2,.55,d)*(N>=7?.85:1)*(.8+Math.random()*.4)+((type==='sweep'||type==='pulse')?.6:0);
 }
 
@@ -310,71 +293,56 @@ const bannerQ=[]; let bannerT=0;
 function banner(b,s){bannerQ.push([b,s]);}
 function tickBanner(dt){const el=$('#banner div');
   if(bannerT>0){bannerT-=dt; if(bannerT<=0)el.classList.add('off'); return;}
-  if(bannerQ.length){const [b,s]=bannerQ.shift(); el.querySelector('b').textContent=b; el.querySelector('span').textContent=s; el.classList.remove('off'); bannerT=2.6;}}
+  if(bannerQ.length){const [b,s]=bannerQ.shift(); el.querySelector('b').textContent=b; el.querySelector('span').textContent=s; el.classList.remove('off'); bannerT=2.4;}}
 
 // ---- 進める ----
-function openExit(){
-  // 今いる所から遠い床を出口にする
-  const dist=new Map([[G.px+','+G.py,0]]); let q=[[G.px,G.py]];
-  while(q.length){const nq=[];for(const [x,y] of q)for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){const nx=x+dx,ny=y+dy,k=nx+','+ny;
+function distFrom(x0,y0){const dist=new Map([[x0+','+y0,0]]); let q=[[x0,y0]];
+  while(q.length){const nq=[];for(const [x,y] of q)for(const [dx,dy] of D4){const nx=x+dx,ny=y+dy,k=nx+','+ny;
     if(walk(nx,ny)&&!dist.has(k)){dist.set(k,dist.get(x+','+y)+1);nq.push([nx,ny]);}} q=nq;}
-  const arr=[...dist.entries()], mx=Math.max(...arr.map(e=>e[1])), far=arr.filter(e=>e[1]>=Math.max(1,Math.ceil(mx*.6)));
-  const k=far[ri(far.length)][0].split(',').map(Number); G.exit=k;
-  banner('出口が開いた','光るマスへ行けば区画を突破'); beep(660,.25,'sine',.05,1320);
+  return dist;}
+function openExits(){
+  // それぞれのロボットから遠い床を、そのロボットの出口にする
+  const ex=[];
+  G.bots.forEach((b,i)=>{const arr=[...distFrom(b.x,b.y).entries()].filter(e=>!ex.some(x=>x.join(',')===e[0])&&!G.bots.some(o=>o.x+','+o.y===e[0]));
+    const mx=Math.max(...arr.map(e=>e[1])), far=arr.filter(e=>e[1]>=Math.max(1,Math.ceil(mx*.6)));
+    ex.push(far[ri(far.length)][0].split(',').map(Number));});
+  G.exits=ex; banner('出口が開いた','L と R を、同じ印の出口へ。2体とも乗れば突破'); beep(660,.25,'sine',.05,1320);
 }
 function update(dt){
   if(!G)return;
-  if(G.state==='dead'||G.state==='pick'){return;}
-  if(G.state==='clear'){G.clearT+=dt; if(G.clearT>.9){G.state='pick'; showPick();} return;}
+  if(G.state==='dead')return;
+  if(G.state==='clear'){G.clearT+=dt; if(G.clearT>1.0)enterRoom(G.room+1); return;}
   G.T+=dt; G.totalT+=dt; const T=G.T;
-  if(!G.exit&&T>=G.exitAt)openExit();
-  for(const h of G.hz)if(h.type==='drone'){ if(T<h.tl)h.cells=[[G.px,G.py]];
+  if(MODE==='duo'&&!G.exits&&T>=G.exitAt)openExits();
+  for(const h of G.hz)if(h.type==='drone'){const b=G.bots[h.bot]; if(T<h.tl)h.cells=[[b.x,b.y]];
     const [x,y]=h.cells[0]; const k=1-Math.exp(-dt*(T<h.tl?7:30)); h.rx+=(cx(x)+CS/2-h.rx)*k; h.ry+=(cy(y)+CS/2-h.ry)*k;}
   for(const h of G.hz)if(!h.fired&&T>=h.tf){h.fired=true; if(h.type==='beam'||h.type==='panel')beep(110,.35,'sawtooth',.03,90); else if(h.type!=='orb')beep(1200,.12,'sawtooth',.025,300); else beep(200,.3,'triangle',.04,120);}
-  if(G.exit&&G.px===G.exit[0]&&G.py===G.exit[1]){clearRoom();return;}
-  for(const h of G.hz)if(active(h,T)&&has(cellsAt(h,T),G.px,G.py)){hit(h);break;}
+  // 撃たれた床は色が消える
+  if(MODE==='paint')for(const h of G.hz)if(active(h,T))for(const c of cellsAt(h,T)){const k=c[0]+','+c[1]; if(G.paint.has(k)){G.paint.delete(k); G.erased.push({x:c[0],y:c[1],t:T});}}
+  G.erased=G.erased.filter(e=>T-e.t<.6);
+  if(!G.god)for(let i=0;i<G.bots.length;i++){const b=G.bots[i]; for(const h of G.hz)if(active(h,T)&&has(cellsAt(h,T),b.x,b.y)){die(h,i);return;}}
+  if(MODE==='duo'&&G.exits&&G.bots.every((b,i)=>b.x===G.exits[i][0]&&b.y===G.exits[i][1])){clearRoom();return;}
+  if(MODE==='paint'&&G.paint.size>=G.goal){clearRoom();return;}
   G.hz=G.hz.filter(h=>h.te>T-.35);
-  if(G.state==='play')spawn();
-  const k=1-Math.exp(-dt*24); G.vx+=(G.px-G.vx)*k; G.vy+=(G.py-G.vy)*k;
-}
-function hit(h){
-  const T=G.T; if(T<G.inv)return;
-  if(G.dodges>0){
-    const ds=dangerSet(G.hz,T), ds2=dangerSet(G.hz,T+.15);
-    const c=shuffle([[1,0],[-1,0],[0,1],[0,-1]]).map(([dx,dy])=>[G.px+dx,G.py+dy]).find(([x,y])=>canEnter(x,y,T)&&!ds.has(x+','+y)&&!ds2.has(x+','+y));
-    if(c){G.dodges--; G.px=c[0]; G.py=c[1]; G.inv=T+.25; banner('緊急回避','この区画ではもう使えない'); beep(900,.15,'sine',.05,1800); return;}
-  }
-  if(G.shields>0){G.shields--; G.inv=T+1.0; G.flash=.6; G.shake=.5; banner('シールドで耐えた','残り '+G.shields); beep(300,.3,'square',.05,150); return;}
-  die(h);
+  spawn();
+  const k=1-Math.exp(-dt*24); for(const b of G.bots){b.vx+=(b.x-b.vx)*k; b.vy+=(b.y-b.vy)*k;}
 }
 function clearRoom(){
   G.state='clear'; G.clearT=0; G.hz=[]; beep(523,.12,'sine',.05); setTimeout(()=>beep(784,.2,'sine',.05),120);
-  const b=getBest(); if(G.room>b)setBest(G.room);
+  if(G.room>getBest(MODE))setBest(MODE,G.room);
+  banner('区画 '+G.room+' を突破','次の区画へ');
 }
-function showPick(){
-  $('#pickTitle').textContent='区画 '+G.room+' を突破';
-  const opts=shuffle(MODS.slice()).slice(0,3);
-  $('#mods').innerHTML=opts.map((m,i)=>`<button class="mod" data-m="${m.id}"><small>${i+1}${cnt(m.id)?'　所持 '+cnt(m.id):''}</small><b>${m.name}</b><span>${m.desc}</span></button>`).join('');
-  $('#ovPick').hidden=false;
-}
-function takeMod(id){
-  if(!G||G.state!=='pick')return;
-  G.mods[id]=(G.mods[id]||0)+1;
-  if(id==='shield')G.shields+=1; if(id==='armor')G.shields+=2;
-  $('#ovPick').hidden=true; enterRoom(G.room+1);
-}
-$('#mods').addEventListener('click',e=>{const b=e.target.closest('.mod'); if(b)takeMod(b.dataset.m);});
-function die(h){
-  G.state='dead'; G.cause=h; G.shake=1; G.flash=1; beep(220,.6,'sawtooth',.06,40);
+function die(h,bi){
+  G.state='dead'; G.cause=h; G.deadBot=bi; G.shake=1; G.flash=1; beep(220,.6,'sawtooth',.06,40);
   setTimeout(showResult,900);
 }
 function showResult(){
-  const cleared=G.room-1, best=getBest();
+  const cleared=G.room-1, best=getBest(MODE);
+  $('#rHead').textContent='ラン終了：'+MODES[MODE].name;
   $('#rMain').textContent='区画 '+G.room+' で停止';
-  const ms=Object.entries(G.mods).map(([k,v])=>MMAP[k].name+(v>1?'×'+v:'')).join('・')||'なし';
-  $('#rSub').innerHTML='突破 '+cleared+' 区画　／　'+G.totalT.toFixed(1)+' 秒<br>当たった障害：<b style="color:'+TMAP[G.cause.type].color+'">'+TMAP[G.cause.type].name+'</b><br>装備：'+ms+'<br>'+
-    (cleared>0&&cleared>=best?'最高記録':'最高：区画 '+best+' まで突破');
-  $('#go').textContent='もう一回'; $('#ovStart').hidden=false; showBest(); $('#go').focus({preventScroll:true});
+  $('#rSub').innerHTML='突破 '+cleared+' 区画　／　'+G.totalT.toFixed(1)+' 秒<br>当たった障害：<b style="color:'+TMAP[G.cause.type].color+'">'+TMAP[G.cause.type].name+'</b>'+
+    (MODE==='duo'?'（'+BOTN[G.deadBot]+' が当たった）':'')+'<br>'+(cleared>0&&cleared>=best?'最高記録':'最高：区画 '+best+' まで突破');
+  $('#ovStart').hidden=false; showBest(); document.querySelector('.modeBtn[data-mode="'+MODE+'"]').focus({preventScroll:true});
 }
 
 // ---- 描く ----
@@ -382,19 +350,17 @@ function rr(x,y,w,h,r){ctx.beginPath();ctx.roundRect?ctx.roundRect(x,y,w,h,r):ct
 function glow(col,b){ctx.shadowColor=col;ctx.shadowBlur=b;}
 function hatch(x,y,col,a){ctx.save(); rr(x,y,CS,CS,4); ctx.clip(); ctx.strokeStyle=col; ctx.globalAlpha=a; ctx.lineWidth=Math.max(2,CS*.05);
   for(let i=-CS;i<CS*2;i+=CS/5){ctx.beginPath();ctx.moveTo(x+i,y);ctx.lineTo(x+i-CS,y+CS);ctx.stroke();} ctx.restore();}
-const NUMF=()=>'700 11px '+getComputedStyle(document.documentElement).getPropertyValue('--f-num');
+const FNUM=getComputedStyle(document.documentElement).getPropertyValue('--f-num'), FJP=getComputedStyle(document.documentElement).getPropertyValue('--f-jp');
+const NUMF=()=>'700 11px '+FNUM;
 function lineGeo(h){const c=(h.axis==='row'?cy(h.idx):cx(h.idx))+CS/2; const s=h.axis==='row'?BX:BY; return {c,s,e:s+S};}
-// 通り道の i 番目のマスの中心（発射口の側から数える）
 function along(h,g,i){const step=CS+GAP; return h.side?g.e-i*step-CS/2:g.s+i*step+CS/2;}
 function pt(h,g,a){return h.axis==='row'?[a,g.c]:[g.c,a];}
 function emitter(h,g){return pt(h,g,h.side?g.e+16:g.s-16);}
-// 線の終わり：柱があれば柱の手前、無ければ反対の壁の外
 function lineEnd(h,g){const step=CS+GAP; if(h.stop){const i=h.path.length; return h.side?g.e-i*step+GAP/2:g.s+i*step-GAP/2;} return h.side?g.s-16:g.e+16;}
 function band(h,g,a0,a1,th){const lo=Math.min(a0,a1),hi=Math.max(a0,a1); if(h.axis==='row')ctx.fillRect(lo,g.c-th/2,hi-lo,th); else ctx.fillRect(g.c-th/2,lo,th,hi-lo);}
 
 function drawRoom(T){
   const e=G?G.enter:0;
-  ctx.font=NUMF(); ctx.textAlign='center'; ctx.textBaseline='middle';
   for(let i=0;i<N;i++){
     let rowHas=false,colHas=false; for(let j=0;j<N;j++){if(at(j,i)===1)rowHas=true; if(at(i,j)===1)colHas=true;}
     const m=cx(i)+CS/2, n=cy(i)+CS/2;
@@ -404,7 +370,9 @@ function drawRoom(T){
   for(let y=0;y<N;y++)for(let x=0;x<N;x++){
     const v=at(x,y); if(!v)continue;
     const X=cx(x),Y=cy(y); ctx.globalAlpha=e>0?clamp(1-e*1.4+((x+y)/(2*N))*.8):1;
-    if(v===1){ctx.fillStyle='#0c1520'; rr(X,Y,CS,CS,4); ctx.fill(); ctx.strokeStyle='rgba(79,216,255,.22)'; ctx.lineWidth=1; ctx.stroke();
+    if(v===1){const painted=G&&MODE==='paint'&&G.paint&&G.paint.has(x+','+y);
+      ctx.fillStyle=painted?'#0f3a4c':'#0c1520'; rr(X,Y,CS,CS,4); ctx.fill(); ctx.strokeStyle=painted?'rgba(79,216,255,.75)':'rgba(79,216,255,.22)'; ctx.lineWidth=painted?2:1; ctx.stroke();
+      if(painted){ctx.fillStyle='rgba(79,216,255,.18)'; rr(X+CS*.18,Y+CS*.18,CS*.64,CS*.64,3); ctx.fill();}
       ctx.fillStyle='rgba(79,216,255,.35)'; const k=Math.max(3,CS*.08);
       ctx.fillRect(X+3,Y+3,k,1.5); ctx.fillRect(X+3,Y+3,1.5,k); ctx.fillRect(X+CS-3-k,Y+CS-4.5,k,1.5); ctx.fillRect(X+CS-4.5,Y+CS-3-k,1.5,k);}
     else{ // 柱
@@ -414,10 +382,12 @@ function drawRoom(T){
       ctx.fillStyle='#8fb3c8'; ctx.fillRect(X+CS*.3,Y+CS*.34,CS*.4,2);}
     ctx.globalAlpha=1;
   }
-  if(G&&G.exit){const [x,y]=G.exit,X=cx(x),Y=cy(y),p=(T*1.6)%1;
-    glow('#7dffd8',20); ctx.fillStyle='#7dffd8'; ctx.globalAlpha=.25+.15*Math.sin(T*6); rr(X,Y,CS,CS,4); ctx.fill(); ctx.shadowBlur=0; ctx.globalAlpha=1;
-    ctx.strokeStyle='#7dffd8'; ctx.lineWidth=2; for(let i=0;i<2;i++){const q=(p+i*.5)%1, o=q*CS*.4; ctx.globalAlpha=1-q; rr(X+o,Y+o,CS-2*o,CS-2*o,4); ctx.stroke();}
-    ctx.globalAlpha=1; ctx.fillStyle='#eafff9'; ctx.font='700 '+Math.max(10,CS*.2)+'px '+getComputedStyle(document.documentElement).getPropertyValue('--f-jp'); ctx.fillText('出口',X+CS/2,Y+CS/2);}
+  if(G)for(const er of G.erased){const q=(T-er.t)/.6, X=cx(er.x),Y=cy(er.y); ctx.strokeStyle='#ff4d6d'; ctx.globalAlpha=1-q; ctx.lineWidth=2;
+    const o=q*CS*.15; rr(X-o,Y-o,CS+2*o,CS+2*o,5); ctx.stroke(); ctx.globalAlpha=1;}
+  if(G&&G.exits)G.exits.forEach(([x,y],i)=>{const col=BOTC[i],X=cx(x),Y=cy(y),p=(T*1.6)%1;
+    glow(col,18); ctx.fillStyle=col; ctx.globalAlpha=.2+.12*Math.sin(T*6); rr(X,Y,CS,CS,4); ctx.fill(); ctx.shadowBlur=0; ctx.globalAlpha=1;
+    ctx.strokeStyle=col; ctx.lineWidth=2; for(let j=0;j<2;j++){const q=(p+j*.5)%1, o=q*CS*.4; ctx.globalAlpha=1-q; rr(X+o,Y+o,CS-2*o,CS-2*o,4); ctx.stroke();}
+    ctx.globalAlpha=1; ctx.fillStyle=col; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.font='700 '+Math.max(10,CS*.2)+'px '+FJP; ctx.fillText('出口 '+BOTN[i],X+CS/2,Y+CS*.78);});
 }
 function drawHazards(T){
   for(const h of G.hz){
@@ -440,12 +410,10 @@ function drawHazards(T){
     }
     if(h.type==='beam'&&act){for(const [x,y] of h.cells)hatch(cx(x),cy(y),col,.35);}
   }
-  // エネルギー球
   for(const h of G.hz){ if(h.type!=='orb')continue;
     const col=TMAP.orb.color, g=lineGeo(h), [ex,ey]=emitter(h,g);
     if(T<h.tf){const f=clamp((T-h.t0)/(h.tf-h.t0));
-      ctx.fillStyle=col; ctx.globalAlpha=.06+.1*f; for(const c of h.cells){rr(cx(c[0]),cy(c[1]),CS,CS,4); ctx.fill();}
-      ctx.globalAlpha=.75; h.path.forEach((c,i)=>{const [x,y]=pt(h,g,along(h,g,i)); ctx.beginPath(); ctx.arc(x,y,2.5,0,7); ctx.fill();});
+      ctx.fillStyle=col; ctx.globalAlpha=.75; h.path.forEach((c,i)=>{const [x,y]=pt(h,g,along(h,g,i)); ctx.beginPath(); ctx.arc(x,y,2.5,0,7); ctx.fill();});
       if(h.stop){const [x,y]=pt(h,g,lineEnd(h,g)); ctx.fillRect(x-3,y-3,6,6);}
       ctx.globalAlpha=1; glow(col,6+12*f); ctx.beginPath(); ctx.arc(ex,ey,CS*.1+CS*.12*f,0,7); ctx.fill(); ctx.shadowBlur=0; continue;}
     if(T>=h.te)continue;
@@ -456,7 +424,6 @@ function drawHazards(T){
       ctx.beginPath(); ctx.arc(x,y,CS*.26*(1-i*.12),0,7); ctx.fill(); ctx.shadowBlur=0;}
     const [x,y]=pt(h,g,along(h,g,u)); ctx.globalAlpha=1; ctx.strokeStyle=col; ctx.lineWidth=3; ctx.beginPath(); ctx.arc(x,y,CS*.26,0,7); ctx.stroke();
   }
-  // 線の障害
   for(const h of G.hz){
     if(h.type!=='laser'&&h.type!=='beam'&&h.type!=='sweep')continue;
     const col=TMAP[h.type].color, f=clamp((T-h.t0)/(h.tf-h.t0)), g=lineGeo(h), [ex,ey]=emitter(h,g), a0=h.side?g.e+16:g.s-16, a1=lineEnd(h,g);
@@ -474,7 +441,6 @@ function drawHazards(T){
       ctx.globalAlpha=1;
     } else {ctx.fillStyle=col; ctx.globalAlpha=clamp(1-(T-h.te)/.35)*.4; band(h,g,a0,a1,3); ctx.globalAlpha=1;}
   }
-  // 照準ドローン
   for(const h of G.hz){ if(h.type!=='drone')continue; const col=TMAP.drone.color;
     const lock=T>=h.tl, f=lock?clamp((T-h.tl)/(h.tf-h.tl)):0;
     if(active(h,T)){const [x,y]=h.cells[0]; glow(col,20); ctx.fillStyle=col; ctx.globalAlpha=.85; rr(cx(x),cy(y),CS,CS,4); ctx.fill(); ctx.shadowBlur=0; ctx.globalAlpha=1; continue;}
@@ -487,16 +453,16 @@ function drawHazards(T){
     if(lock){const [x,y]=h.cells[0]; ctx.fillStyle=col; ctx.globalAlpha=.12+.25*f; rr(cx(x),cy(y),CS,CS,4); ctx.fill(); ctx.globalAlpha=1;}
   }
 }
-function drawPlayer(T){
-  let X=cx(G.vx)+CS/2, Y=cy(G.vy)+CS/2;
-  if(G.bump){const t=(T-G.bump.t)/.12; if(t<1){const o=Math.sin(t*Math.PI)*CS*.08; X+=G.bump.dx*o; Y+=G.bump.dy*o;} else G.bump=null;}
-  if(G.state==='play'&&T<G.inv&&Math.floor(T*16)%2)return;
-  const r=CS*.26, dead=G.state==='dead', col=dead?'#ff4d6d':'#e9fbff';
-  glow('#4fd8ff',dead?0:18); ctx.fillStyle='#0b2533'; ctx.beginPath(); ctx.arc(X,Y,r,0,7); ctx.fill();
-  ctx.lineWidth=3; ctx.strokeStyle=col; ctx.stroke(); ctx.shadowBlur=0;
-  if(G.shields>0){ctx.strokeStyle='rgba(79,216,255,.6)'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(X,Y,r+5,0,7); ctx.stroke();}
-  ctx.fillStyle=col; ctx.fillRect(X-r*.55,Y-r*.18,r*1.1,r*.36);
-  ctx.fillStyle='#4fd8ff'; ctx.fillRect(X-r*.2+Math.sin(T*3)*r*.25,Y-r*.12,r*.4,r*.24);
+function drawBots(T){
+  G.bots.forEach((b,i)=>{
+    let X=cx(b.vx)+CS/2, Y=cy(b.vy)+CS/2;
+    if(b.bump){const t=(T-b.bump.t)/.12; if(t<1){const o=Math.sin(t*Math.PI)*CS*.08; X+=b.bump.dx*o; Y+=b.bump.dy*o;} else b.bump=null;}
+    const r=CS*.27, dead=G.state==='dead'&&G.deadBot===i, col=dead?'#ff4d6d':BOTC[i];
+    glow(BOTC[i],dead?0:18); ctx.fillStyle='#0b2533'; ctx.beginPath(); ctx.arc(X,Y,r,0,7); ctx.fill();
+    ctx.lineWidth=3; ctx.strokeStyle=col; ctx.stroke(); ctx.shadowBlur=0;
+    if(MODE==='duo'){ctx.fillStyle=col; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.font='700 '+Math.max(11,r*.95)+'px '+FNUM; ctx.fillText(BOTN[i],X,Y+1);}
+    else{ctx.fillStyle=col; ctx.fillRect(X-r*.55,Y-r*.18,r*1.1,r*.36); ctx.fillStyle='#4fd8ff'; ctx.fillRect(X-r*.2+Math.sin(T*3)*r*.25,Y-r*.12,r*.4,r*.24);}
+  });
 }
 function draw(){
   const T=G?G.T:0;
@@ -505,19 +471,23 @@ function draw(){
   for(let x=(W/2)%st;x<W;x+=st){ctx.beginPath();ctx.moveTo(x+.5,0);ctx.lineTo(x+.5,H);ctx.stroke();}
   for(let y=(H/2)%st;y<H;y+=st){ctx.beginPath();ctx.moveTo(0,y+.5);ctx.lineTo(W,y+.5);ctx.stroke();}
   if(!G){M=new Array(16).fill(1); N=4; layout();}
+  if(G&&MODE==='duo'){ // 左右の受け持ちの境目
+    ctx.strokeStyle='rgba(216,236,245,.08)'; ctx.setLineDash([3,7]); ctx.beginPath(); ctx.moveTo(W/2+.5,0); ctx.lineTo(W/2+.5,H); ctx.stroke(); ctx.setLineDash([]);
+    ctx.font='700 12px '+FNUM; ctx.textAlign='center'; ctx.textBaseline='bottom'; ctx.globalAlpha=.5;
+    ctx.fillStyle=BOTC[0]; ctx.fillText('L',W*.25,H-4); ctx.fillStyle=BOTC[1]; ctx.fillText('R',W*.75,H-4); ctx.globalAlpha=1;}
   if(G&&G.shake>0)ctx.translate((Math.random()-.5)*12*G.shake,(Math.random()-.5)*12*G.shake);
   drawRoom(T);
-  if(G){ if(G.state!=='clear')drawHazards(T); drawPlayer(T);
+  if(G){ if(G.state!=='clear')drawHazards(T); drawBots(T);
     if(G.flash>0){ctx.setTransform(DPR,0,0,DPR,0,0); ctx.fillStyle='rgba(255,77,109,'+(G.flash*.35)+')'; ctx.fillRect(0,0,W,H);}}
 }
 function hud(){
   if(!G)return;
-  $('#room').textContent='区画 '+G.room; $('#shape').textContent=G.shapeName+' '+N+'×'+N;
-  const t=$('#time');
-  if(G.state==='clear'){$('#midLabel').textContent='突破'; t.textContent='CLEAR'; t.className='open';}
-  else if(G.exit){$('#midLabel').textContent='出口が開いた'; t.textContent='出口へ'; t.className='open';}
-  else {$('#midLabel').textContent='出口が開くまで'; t.textContent=Math.max(0,G.exitAt-G.T).toFixed(1); t.className='';}
-  $('#shields').textContent=[G.shields?'盾 '+G.shields:'',G.dodges?'回避 '+G.dodges:''].filter(Boolean).join('　');
+  $('#room').textContent='区画 '+G.room; $('#shape').textContent=N+'×'+N+'　床 '+floors().length;
+  const t=$('#time'), L=$('#midLabel');
+  if(G.state==='clear'){L.textContent='突破'; t.textContent='CLEAR'; t.className='open';}
+  else if(MODE==='paint'){L.textContent='塗った床 ／ 目標'; t.textContent=G.paint.size+'/'+G.goal; t.className=G.paint.size>=G.goal*.8?'open':'';}
+  else if(G.exits){L.textContent='出口が開いた'; t.textContent='L・R 出口へ'; t.className='open'; t.style.fontSize='22px';}
+  else {L.textContent='出口が開くまで'; t.textContent=Math.max(0,G.exitAt-G.T).toFixed(1); t.className=''; t.style.fontSize='';}
 }
 
 let last=performance.now();
@@ -530,32 +500,32 @@ function frame(now){
 requestAnimationFrame(frame);
 
 // ---- 操作 ----
-$('#go').addEventListener('click',startRun);
-const KEYS={ArrowUp:[0,-1],ArrowDown:[0,1],ArrowLeft:[-1,0],ArrowRight:[1,0],w:[0,-1],s:[0,1],a:[-1,0],d:[1,0]};
+document.querySelectorAll('.modeBtn').forEach(b=>b.addEventListener('click',()=>startRun(b.dataset.mode)));
+const K1={w:[0,-1],s:[0,1],a:[-1,0],d:[1,0]}, K2={ArrowUp:[0,-1],ArrowDown:[0,1],ArrowLeft:[-1,0],ArrowRight:[1,0]};
 let lastKey=0;
 window.addEventListener('keydown',e=>{
-  if(!$('#ovPick').hidden){const i=+e.key-1; const b=document.querySelectorAll('.mod')[i]; if(b){e.preventDefault(); takeMod(b.dataset.m);} return;}
-  if(!$('#ovStart').hidden){ if(e.key==='Enter'&&document.activeElement.tagName!=='BUTTON'){e.preventDefault(); startRun();} return;}
-  const k=KEYS[e.key.length===1?e.key.toLowerCase():e.key]; if(!k)return; e.preventDefault();
-  const now=performance.now(); if(e.repeat&&now-lastKey<95)return; lastKey=now; tryMove(k[0],k[1]);
+  if(!$('#ovStart').hidden)return;
+  const key=e.key.length===1?e.key.toLowerCase():e.key; let bi=0,k=K1[key];
+  if(!k){k=K2[key]; bi=MODE==='duo'?1:0;} if(!k)return; e.preventDefault();
+  const now=performance.now(); if(e.repeat&&now-lastKey<95)return; lastKey=now; tryMove(bi,k[0],k[1]);
 });
-// 指ごとに覚える。両手で触っても、どの指も1回のタッチで1マスだけ動く
+// 指ごとに覚える。どの指も1回のタッチで1マスだけ。二体同時では、触り始めた側（左右）でロボットが決まる
 const touches=new Map(), app=$('#app');
 app.addEventListener('pointerdown',e=>{
   if(!G||G.state!=='play'||e.target.closest('button'))return;
-  e.preventDefault(); touches.set(e.pointerId,{x:e.clientX,y:e.clientY,used:false});
+  e.preventDefault(); touches.set(e.pointerId,{x:e.clientX,y:e.clientY,used:false,bot:MODE==='duo'&&e.clientX>=window.innerWidth/2?1:0});
   try{app.setPointerCapture(e.pointerId);}catch(_){}
 });
 app.addEventListener('pointermove',e=>{
   const t=touches.get(e.pointerId); if(!t||t.used)return;
   const th=Math.max(14,Math.min(28,CS*.25)), dx=e.clientX-t.x, dy=e.clientY-t.y;
   if(Math.abs(dx)<th&&Math.abs(dy)<th)return;
-  t.used=true; if(Math.abs(dx)>Math.abs(dy))tryMove(Math.sign(dx),0); else tryMove(0,Math.sign(dy));
+  t.used=true; if(Math.abs(dx)>Math.abs(dy))tryMove(t.bot,Math.sign(dx),0); else tryMove(t.bot,0,Math.sign(dy));
 });
 function release(e){touches.delete(e.pointerId);}
 app.addEventListener('pointerup',release); app.addEventListener('pointercancel',release);
 // 試しの撮影用（画面には出ない）
-window.__lab={get G(){return G;},enterRoom:k=>{G.state='play';$('#ovPick').hidden=true;enterRoom(k);},takeMod,startRun};
+window.__lab={get G(){return G;},enterRoom:k=>{G.state='play';enterRoom(k);},startRun,genRoom,tryMove};
 })();
 </script>
 </body>
