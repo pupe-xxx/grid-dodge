@@ -70,7 +70,7 @@ details ul{margin:6px 0 0;padding-left:1.2em;line-height:1.7}
     <div class="r"><div id="modeTag"></div><button class="icon" id="mute" aria-label="音の入り切り">音 入</button></div>
   </div>
   <div id="stage"><canvas id="cv"></canvas><div id="banner"><div class="off"><b></b><span></span></div></div></div>
-  <div id="foot">（試作 v7）</div>
+  <div id="foot">（試作 v8）</div>
 </div>
 
 <div class="ov" id="ovStart">
@@ -165,6 +165,7 @@ function genRoom(k){
       for(let p=0,g=0;p<pil&&g<60;g++){const i=ri(n*n); if(m[i]===1&&nb(m,n,i)>=3){m[i]=2;p++;}}
     }
     for(let ch=true;ch;){ch=false; for(let i=0;i<m.length;i++)if(m[i]===1&&nb(m,n,i)<2){m[i]=0;ch=true;}}
+    for(let i=0;i<m.length;i++)if(m[i]===2&&nb(m,n,i)<2)m[i]=0; // 床から離れた柱は消す
     const fc=m.filter(v=>v===1).length;
     if(fc>=Math.max(9,n*n*.4)&&connected(m,n))return {n,m};
   }
@@ -177,7 +178,7 @@ function startRun(mode){
   if(mode)MODE=mode;
   if(!AC){try{AC=new (window.AudioContext||window.webkitAudioContext)();}catch(e){}} else if(AC.state==='suspended')AC.resume();
   G={room:0,totalT:0,state:'play',T:0,hz:[],gid:0,shake:0,flash:0,cause:null,erased:[]};
-  $('#ovStart').hidden=true; $('#result').hidden=false; $('#foot').textContent=MODES[MODE].foot+'　（試作 v7）';
+  $('#ovStart').hidden=true; $('#result').hidden=false; $('#foot').textContent=MODES[MODE].foot+'　（試作 v8）';
   $('#modeTag').textContent=MODES[MODE].name; enterRoom(1);
 }
 function nearest(fl,tx,ty,not){let best=null,bd=1e9;for(const f of fl){if(not&&f[0]===not[0]&&f[1]===not[1])continue;
@@ -187,12 +188,12 @@ function enterRoom(k){
   const fl=floors(), c=(N-1)/2, bots=[];
   if(MODE==='duo'){const a=nearest(fl,c-1.5,c), b=nearest(fl,c+1.5,c,a); bots.push(mk(a),mk(b));}
   else bots.push(mk(nearest(fl,c,c)));
-  function mk(p){return {x:p[0],y:p[1],vx:p[0],vy:p[1],bump:null};}
+  function mk(p){return {x:p[0],y:p[1],tx:p[0],ty:p[1],fx:p[0],fy:p[1],mt:0,moving:false,q:null,vx:p[0],vy:p[1],bump:null};}
   Object.assign(G,{room:k,state:'play',T:0,hz:[],bots,exits:null,exitAt:Math.min(20,11+k*1.5),nextSpawn:.9,enter:1,erased:[]});
-  if(MODE==='paint'){G.paint=new Set([bots[0].x+','+bots[0].y]); G.goal=Math.ceil(fl.length*.7);}
+  if(MODE==='paint'){const ratio=paintRatio(k); G.paint=new Map([[bots[0].x+','+bots[0].y,-1]]); G.lastPaint=-1; G.ratio=ratio; G.goal=Math.ceil(fl.length*ratio);}
   bannerQ.length=0; bannerT=0;
   if(MODE==='duo')banner('区画 '+k+'：'+N+'×'+N,'左手で L、右手で R。出口が開いたら、それぞれの出口へ');
-  else banner('区画 '+k+'：'+N+'×'+N,'床の 70%（'+G.goal+' マス）を塗れば突破。撃たれた床は消える');
+  else banner('区画 '+k+'：'+N+'×'+N,(G.goal>=fl.length?'床を全部（':'床の '+Math.round(G.ratio*100)+'%（')+G.goal+' マス）塗れば突破。撃たれた床は消える');
   const t=TYPES[Math.min(TYPES.length-1,k)];
   if(k>1&&k<TYPES.length)banner('新しい試験：'+t.name,t.desc);
   beep(330,.3,'sine',.05,880);
@@ -205,14 +206,30 @@ const has=(cells,x,y)=>cells.some(c=>c[0]===x&&c[1]===y);
 function blockedAt(x,y,t){return G.hz.some(h=>h.blocks&&active(h,t)&&has(h.cells,x,y));}
 function canEnter(x,y,t){return walk(x,y)&&!blockedAt(x,y,t);}
 
+// 塗る割合：区画 1 は 85%、区画ごとに 3% 増え、区画 6 から全部
+function paintRatio(k){return Math.min(1,.85+(k-1)*.03);}
+// 移動は MOVE 秒かけて隣のマスへ。半分進んだ所で当たり判定が次のマスへ移る（見た目と判定をそろえる）
+const MOVE=.11, PAINT_T=.2;
+const posOf=b=>b.moving?[b.tx,b.ty]:[b.x,b.y];
 function tryMove(bi,dx,dy){
   if(!G||G.state!=='play')return false;
   const b=G.bots[bi]; if(!b)return false;
-  const nx=b.x+dx,ny=b.y+dy, other=G.bots.find((o,i)=>i!==bi&&o.x===nx&&o.y===ny);
+  if(b.moving){b.q=[dx,dy]; return false;} // 動いている間のフリックは 1 つだけ覚えておき、着いたら動く
+  const nx=b.x+dx,ny=b.y+dy, other=G.bots.some((o,i)=>i!==bi&&((o.x===nx&&o.y===ny)||(o.tx===nx&&o.ty===ny)));
   if(!canEnter(nx,ny,G.T)||other){b.bump={dx,dy,t:G.T}; beep(140,.06,'square',.025); return false;}
-  b.x=nx;b.y=ny; beep(bi?600:520+ri(60),.04,'triangle',.03);
-  if(MODE==='paint'){const k=nx+','+ny; if(!G.paint.has(k)){G.paint.add(k); beep(760+G.paint.size*8,.05,'sine',.025);}}
+  Object.assign(b,{fx:b.x,fy:b.y,tx:nx,ty:ny,mt:G.T,moving:true}); beep(bi?600:520+ri(60),.04,'triangle',.03);
   return true;
+}
+function stepBots(T){
+  G.bots.forEach((b,bi)=>{
+    if(!b.moving){b.vx=b.x; b.vy=b.y; return;}
+    const p=clamp((T-b.mt)/MOVE), e=1-(1-p)*(1-p);
+    b.vx=lerp(b.fx,b.tx,e); b.vy=lerp(b.fy,b.ty,e);
+    if(p>=.5){b.x=b.tx; b.y=b.ty;}
+    if(p>=1){b.moving=false;
+      if(MODE==='paint'){const k=b.x+','+b.y; if(!G.paint.has(k)){G.paint.set(k,T); G.lastPaint=T; beep(760+G.paint.size*8,.05,'sine',.025);}}
+      if(b.q){const [dx,dy]=b.q; b.q=null; tryMove(bi,dx,dy);}}
+  });
 }
 
 // ---- 障害 ----
@@ -230,7 +247,7 @@ function mkLine(type,L,t0,tf,dur,extra){const tr=travel(L.axis,L.idx,L.side);
   return Object.assign({type,axis:L.axis,idx:L.idx,side:L.side,path:tr.path,stop:tr.stop,cells:tr.path.filter(c=>walk(c[0],c[1])),t0,tf,te:tf+dur,blocks:type==='beam'},extra||{});}
 function randFloor(){const f=floors();return f[ri(f.length)];}
 function build(type,bi,aim){
-  const T=G.T,w=warnTime(),d=diff(),gid=++G.gid,b=G.bots[bi];
+  const T=G.T,w=warnTime(),d=diff(),gid=++G.gid,[bx,by]=posOf(G.bots[bi]),b={x:bx,y:by};
   if(type==='laser'){const L=pickLine(b,aim); return L&&[mkLine('laser',L,T,T+w,.16,{gid})];}
   if(type==='orb'){const L=pickLine(b,aim); if(!L)return null; const per=lerp(.62,.34,d), tf=T+w*.9; const h=mkLine('orb',L,T,tf,0,{gid,per,blocks:false}); h.te=tf+(h.path.length+.7)*per; h.cells=[]; return [h];}
   if(type==='beam'){const L=pickLine(b,aim); return L&&[mkLine('beam',L,T,T+w*1.1,2.3+Math.random()*1.1,{gid})];}
@@ -262,7 +279,7 @@ function fair(cands){
   const all=G.hz.concat(cands), needBlock=cands.some(c=>c.blocks), fc=floors().length, nb=G.bots.length;
   const times=[]; for(const c of cands){times.push(c.tf+.02); if(c.blocks)times.push((c.tf+c.te)/2,c.te-.03); if(c.type==='orb')for(let k=0;k<c.path.length;k++)times.push(c.tf+c.per*(k+.6));}
   for(const t of times){const ds=dangerSet(all,t); if(fc-ds.size<(needBlock?2:1)+nb)return false;}
-  for(const c of cands)for(const b of G.bots){
+  for(const c of cands)for(const bb of G.bots){const [px,py]=posOf(bb),b={x:px,y:py};
     const steps=Math.max(1,Math.floor((c.tf-G.T)/(nb>1?.24:.17)));
     const ds=dangerSet(all,c.tf+.02), ds2=dangerSet(all,c.tf+.12);
     const seen=new Set([b.x+','+b.y]); let q=[[b.x,b.y]], ok=false;
@@ -320,12 +337,13 @@ function update(dt){
   // 撃たれた床は色が消える
   if(MODE==='paint')for(const h of G.hz)if(active(h,T))for(const c of cellsAt(h,T)){const k=c[0]+','+c[1]; if(G.paint.has(k)){G.paint.delete(k); G.erased.push({x:c[0],y:c[1],t:T});}}
   G.erased=G.erased.filter(e=>T-e.t<.6);
+  stepBots(T);
   if(!G.god)for(let i=0;i<G.bots.length;i++){const b=G.bots[i]; for(const h of G.hz)if(active(h,T)&&has(cellsAt(h,T),b.x,b.y)){die(h,i);return;}}
-  if(MODE==='duo'&&G.exits&&G.bots.every((b,i)=>b.x===G.exits[i][0]&&b.y===G.exits[i][1])){clearRoom();return;}
-  if(MODE==='paint'&&G.paint.size>=G.goal){clearRoom();return;}
+  // 突破は、着いて（塗り終えて）から
+  if(MODE==='duo'&&G.exits&&G.bots.every((b,i)=>!b.moving&&b.x===G.exits[i][0]&&b.y===G.exits[i][1])){clearRoom();return;}
+  if(MODE==='paint'&&G.paint.size>=G.goal&&T-G.lastPaint>=PAINT_T+.12){clearRoom();return;}
   G.hz=G.hz.filter(h=>h.te>T-.35);
   spawn();
-  const k=1-Math.exp(-dt*24); for(const b of G.bots){b.vx+=(b.x-b.vx)*k; b.vy+=(b.y-b.vy)*k;}
 }
 function clearRoom(){
   G.state='clear'; G.clearT=0; G.hz=[]; beep(523,.12,'sine',.05); setTimeout(()=>beep(784,.2,'sine',.05),120);
@@ -370,9 +388,9 @@ function drawRoom(T){
   for(let y=0;y<N;y++)for(let x=0;x<N;x++){
     const v=at(x,y); if(!v)continue;
     const X=cx(x),Y=cy(y); ctx.globalAlpha=e>0?clamp(1-e*1.4+((x+y)/(2*N))*.8):1;
-    if(v===1){const painted=G&&MODE==='paint'&&G.paint&&G.paint.has(x+','+y);
-      ctx.fillStyle=painted?'#0f3a4c':'#0c1520'; rr(X,Y,CS,CS,4); ctx.fill(); ctx.strokeStyle=painted?'rgba(79,216,255,.75)':'rgba(79,216,255,.22)'; ctx.lineWidth=painted?2:1; ctx.stroke();
-      if(painted){ctx.fillStyle='rgba(79,216,255,.18)'; rr(X+CS*.18,Y+CS*.18,CS*.64,CS*.64,3); ctx.fill();}
+    if(v===1){const pt0=G&&MODE==='paint'&&G.paint?G.paint.get(x+','+y):undefined, painted=pt0!==undefined, pa=painted?clamp((T-pt0)/PAINT_T):0;
+      ctx.fillStyle=painted&&pa>.5?'#0f3a4c':'#0c1520'; rr(X,Y,CS,CS,4); ctx.fill(); ctx.strokeStyle=painted?'rgba(79,216,255,.75)':'rgba(79,216,255,.22)'; ctx.lineWidth=painted?2:1; ctx.stroke();
+      if(painted){const o=CS*(.5-.32*pa); ctx.fillStyle='rgba(79,216,255,'+(.18+.5*(1-pa))+')'; rr(X+o,Y+o,CS-2*o,CS-2*o,3); ctx.fill();}
       ctx.fillStyle='rgba(79,216,255,.35)'; const k=Math.max(3,CS*.08);
       ctx.fillRect(X+3,Y+3,k,1.5); ctx.fillRect(X+3,Y+3,1.5,k); ctx.fillRect(X+CS-3-k,Y+CS-4.5,k,1.5); ctx.fillRect(X+CS-4.5,Y+CS-3-k,1.5,k);}
     else{ // 柱
@@ -485,7 +503,7 @@ function hud(){
   $('#room').textContent='区画 '+G.room; $('#shape').textContent=N+'×'+N+'　床 '+floors().length;
   const t=$('#time'), L=$('#midLabel');
   if(G.state==='clear'){L.textContent='突破'; t.textContent='CLEAR'; t.className='open';}
-  else if(MODE==='paint'){L.textContent='塗った床 ／ 目標'; t.textContent=G.paint.size+'/'+G.goal; t.className=G.paint.size>=G.goal*.8?'open':'';}
+  else if(MODE==='paint'){L.textContent='塗った床 ／ 目標'; t.textContent=G.paint.size+'/'+G.goal; t.className=G.paint.size>=G.goal-2?'open':'';}
   else if(G.exits){L.textContent='出口が開いた'; t.textContent='L・R 出口へ'; t.className='open'; t.style.fontSize='22px';}
   else {L.textContent='出口が開くまで'; t.textContent=Math.max(0,G.exitAt-G.T).toFixed(1); t.className=''; t.style.fontSize='';}
 }
@@ -525,7 +543,7 @@ app.addEventListener('pointermove',e=>{
 function release(e){touches.delete(e.pointerId);}
 app.addEventListener('pointerup',release); app.addEventListener('pointercancel',release);
 // 試しの撮影用（画面には出ない）
-window.__lab={get G(){return G;},enterRoom:k=>{G.state='play';enterRoom(k);},startRun,genRoom,tryMove};
+window.__lab={get G(){return G;},enterRoom:k=>{G.state='play';enterRoom(k);},startRun,genRoom,tryMove,step:update};
 })();
 </script>
 </body>
