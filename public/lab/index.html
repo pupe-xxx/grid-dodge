@@ -9,155 +9,135 @@
 <style>
 /* 1画面のゲーム：上に計器、真ん中に試験区画、下に操作の説明。暗い実験場で決め打ち（片方のテーマだけ） */
 :root{
-  --bg:#06090f; --floor:#0c141f; --line:#2a6f8f; --ink:#d8ecf5; --dim:#6f8fa3;
-  --accent:#4fd8ff; --panel:#0b121c; --edge:#1d3242;
-  --laser:#ff4d6d; --beam:#b57bff; --hot:#ff9440; --drone:#ffd43b; --pulse:#7dff9a;
+  --bg:#06090f; --ink:#d8ecf5; --dim:#6f8fa3; --accent:#4fd8ff; --panel:#0b121c; --edge:#1d3242; --exit:#7dffd8;
   --f-num:"Chakra Petch","Segoe UI",system-ui,sans-serif;
   --f-jp:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic",system-ui,sans-serif;
   color-scheme:dark;
 }
 html,body{height:100%;margin:0}
 *{box-sizing:border-box}
-body{font-size:14px}
 [hidden]{display:none!important}
-body{background:var(--bg);color:var(--ink);font-family:var(--f-jp);overflow:hidden;
-  -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
-#app{touch-action:none;height:100vh;height:100dvh;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);display:flex;flex-direction:column;
+body{background:var(--bg);color:var(--ink);font:14px var(--f-jp);overflow:hidden;
+  -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent;touch-action:none}
+#app{touch-action:none;height:100vh;height:100dvh;display:flex;flex-direction:column;
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
-#hud{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;padding-block:10px 4px}
+#hud{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:8px;padding-block:10px 4px}
 #hud .l{min-width:0}
-#phase{font-size:12px;color:var(--dim);letter-spacing:.06em}
-#phaseName{font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-#time{font-family:var(--f-num);font-weight:700;font-size:34px;letter-spacing:.02em;font-variant-numeric:tabular-nums;line-height:1}
-#time small{font-size:14px;color:var(--dim);margin-left:2px}
-#hud .r{justify-self:end;display:flex;gap:10px;align-items:center}
-#best{font-family:var(--f-num);font-size:12px;color:var(--dim);text-align:right;font-variant-numeric:tabular-nums}
-.icon{background:none;border:1px solid var(--edge);color:var(--dim);border-radius:6px;font:12px var(--f-jp);padding:6px 8px;cursor:pointer}
-.icon:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-#stage{flex:1;position:relative;min-height:0;touch-action:none}
+#room{font-size:12px;color:var(--dim);letter-spacing:.06em}
+#shape{font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#mid{text-align:center}
+#midLabel{font-size:11px;color:var(--dim);letter-spacing:.06em}
+#time{font-family:var(--f-num);font-weight:700;font-size:30px;font-variant-numeric:tabular-nums;line-height:1}
+#time.open{color:var(--exit)}
+#hud .r{min-width:0;justify-self:end;display:flex;flex-direction:column;align-items:flex-end;gap:4px}
+#shields{font-size:12px;color:var(--accent);min-height:1em;white-space:nowrap}
+.icon{background:none;border:1px solid var(--edge);color:var(--dim);border-radius:6px;font:12px var(--f-jp);padding:4px 8px;cursor:pointer}
+button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+#stage{flex:1;position:relative;min-height:0}
 #cv{position:absolute;inset:0;display:block;width:100%;height:100%}
 #banner{position:absolute;left:0;right:0;top:6px;display:flex;justify-content:center;pointer-events:none}
-#banner div{background:rgba(8,16,26,.88);border:1px solid var(--edge);border-left:3px solid var(--accent);padding:8px 14px;border-radius:4px;max-width:92%;
-  transition:opacity .25s, transform .25s}
+#banner div{background:rgba(8,16,26,.9);border:1px solid var(--edge);border-left:3px solid var(--accent);padding:8px 14px;border-radius:4px;max-width:92%;transition:opacity .25s,transform .25s}
 #banner b{display:block;font-size:15px}
 #banner span{font-size:12px;color:var(--dim)}
 #banner .off{opacity:0;transform:translateY(-6px)}
 #foot{font-size:12px;color:var(--dim);text-align:center;padding-block:4px 12px;min-height:2.6em}
-#ov{position:fixed;inset:0;background:rgba(4,7,12,.82);display:flex;align-items:flex-start;justify-content:center;overflow:auto;
+.ov{position:fixed;inset:0;background:rgba(4,7,12,.84);display:flex;align-items:flex-start;justify-content:center;overflow:auto;
   padding:max(24px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) 24px max(16px,env(safe-area-inset-left,0px))}
 .card{width:100%;max-width:440px;background:var(--panel);border:1px solid var(--edge);border-radius:10px;padding:20px 18px;display:flex;flex-direction:column;gap:16px;margin-block:auto}
 h1{margin:0;font-family:var(--f-num);font-size:30px;letter-spacing:.04em;line-height:1}
 h1 span{color:var(--accent)}
-.lead{margin:6px 0 0;font-size:13px;color:var(--dim);line-height:1.6}
+h2{margin:0;font-size:18px}
+.lead{margin:6px 0 0;font-size:13px;color:var(--dim);line-height:1.7}
+ol.flow{margin:0;padding-left:1.3em;font-size:13px;line-height:1.8}
 #result{border:1px solid var(--edge);border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:4px}
-#result .big{font-family:var(--f-num);font-size:32px;font-weight:700;font-variant-numeric:tabular-nums}
-#result .why{font-size:13px;color:var(--ink)}
-#result .sub{font-size:12px;color:var(--dim)}
-.grp{display:flex;flex-direction:column;gap:6px}
-.grp>label{font-size:12px;color:var(--dim);letter-spacing:.06em}
-.seg{display:flex;gap:6px;flex-wrap:wrap}
-.seg button,.chip{flex:1 1 auto;min-width:64px;background:#0f1a26;color:var(--ink);border:1px solid var(--edge);border-radius:6px;padding:9px 8px;font:14px var(--f-jp);cursor:pointer}
-.seg button[aria-pressed="true"]{border-color:var(--accent);background:#0f2a38;color:#fff}
-.chips{display:grid;grid-template-columns:1fr 1fr;gap:6px}
-.chip{text-align:left;display:flex;gap:8px;align-items:center;font-size:13px}
-.chip i{width:10px;height:10px;border-radius:2px;flex:none;opacity:.35}
-.chip[aria-pressed="true"] i{opacity:1}
-.chip[aria-pressed="false"]{color:var(--dim)}
-.note{font-size:12px;color:var(--dim);line-height:1.6;margin:0}
-#go{background:var(--accent);color:#04121a;border:0;border-radius:8px;padding:14px;font:700 16px var(--f-jp);cursor:pointer}
+#result .big{font-family:var(--f-num);font-size:30px;font-weight:700;font-variant-numeric:tabular-nums}
+#result .sub{font-size:12px;color:var(--dim);line-height:1.6}
+.go{background:var(--accent);color:#04121a;border:0;border-radius:8px;padding:14px;font:700 16px var(--f-jp);cursor:pointer}
 details{font-size:12px;color:var(--dim)}
 details summary{cursor:pointer}
 details ul{margin:6px 0 0;padding-left:1.2em;line-height:1.7}
+.note{font-size:12px;color:var(--dim);line-height:1.6;margin:0}
+#mods{display:flex;flex-direction:column;gap:10px}
+.mod{text-align:left;background:#0f1a26;color:var(--ink);border:1px solid var(--edge);border-radius:8px;padding:12px 14px;cursor:pointer;display:flex;flex-direction:column;gap:4px;font-family:var(--f-jp)}
+.mod b{font-size:15px}
+.mod span{font-size:12px;color:var(--dim);line-height:1.5}
+.mod small{font-family:var(--f-num);font-size:11px;color:var(--accent)}
+.mod:active{border-color:var(--accent)}
 @media (prefers-reduced-motion:reduce){#banner div{transition:none}}
 </style>
 </head>
 <body>
-
 <div id="app">
   <div id="hud">
-    <div class="l"><div id="phase">試験</div><div id="phaseName">待機中</div></div>
-    <div id="time">0.0<small>秒</small></div>
-    <div class="r"><div id="best">最高 —</div><button class="icon" id="mute" aria-label="音の入り切り">音 入</button></div>
+    <div class="l"><div id="room">区画 —</div><div id="shape">待機中</div></div>
+    <div id="mid"><div id="midLabel">出口が開くまで</div><div id="time">—</div></div>
+    <div class="r"><div id="shields"></div><button class="icon" id="mute" aria-label="音の入り切り">音 入</button></div>
   </div>
   <div id="stage"><canvas id="cv"></canvas><div id="banner"><div class="off"><b></b><span></span></div></div></div>
-  <div id="foot"></div>
+  <div id="foot">フリックで1マス（指を離して次へ・両手で可）　／　キーは矢印・WASD　（試作 v6）</div>
 </div>
 
-<div id="ov">
+<div class="ov" id="ovStart">
   <div class="card">
     <div id="result" hidden>
-      <div class="sub">試験終了</div>
-      <div class="big" id="rTime">0.0 秒</div>
-      <div class="why" id="rWhy"></div>
+      <div class="sub">ラン終了</div>
+      <div class="big" id="rMain"></div>
       <div class="sub" id="rSub"></div>
     </div>
     <div>
       <h1>GRID DODGE <span>LAB</span></h1>
-      <p class="lead">試験区画の床の上で、壁の装置が撃つ試験を生き延びる。動き・見え方・障害の種類を比べるための試作です。</p>
+      <p class="lead">被験体のロボットとして、試験区画を1つずつ抜けていく。</p>
     </div>
-    <div class="grp"><label>盤</label>
-      <div class="seg" data-k="size">
-        <button data-v="3">3×3</button><button data-v="4">4×4</button><button data-v="5">5×5</button><button data-v="grow">広がる</button>
-      </div>
-      <p class="note" id="sizeNote"></p>
-    </div>
-    <div class="grp"><label>操作（スマホ）</label>
-      <div class="seg" data-k="ctrl"><button data-v="drag">A フリック</button><button data-v="tap">B タップ</button></div>
-      <p class="note" id="ctrlNote"></p>
-    </div>
-    <div class="grp"><label>障害</label>
-      <div class="seg" data-k="mode"><button data-v="phase">段階で増える</button><button data-v="pick">自分で選ぶ</button></div>
-      <div class="chips" id="chips" hidden></div>
-      <p class="note" id="modeNote"></p>
-    </div>
-    <details><summary>障害の見分け方</summary><ul id="legend"></ul></details>
-    <button id="go">試験を始める</button>
-    <p class="note">パソコンは矢印キーか WASD（押し続けると続けて動く）。Enter で開始。</p>
+    <ol class="flow">
+      <li>区画の中で、壁の装置が撃つ試験を避ける</li>
+      <li>しばらく生き延びると<b style="color:var(--exit)">出口</b>が開く。そこまで行けば突破</li>
+      <li>次の区画の前に、装備を3つから1つ選ぶ</li>
+      <li>奥ほど区画が広く（最大 8×8）、形も試験も変わる。当たったら最初から</li>
+    </ol>
+    <details><summary>障害と柱の見分け方</summary><ul id="legend"></ul></details>
+    <button class="go" id="go">ランを始める</button>
+    <p class="note" id="bestNote"></p>
+  </div>
+</div>
+
+<div class="ov" id="ovPick" hidden>
+  <div class="card">
+    <div><h2 id="pickTitle">区画 1 を突破</h2><p class="lead">次の区画へ持っていく装備を1つ選ぶ。</p></div>
+    <div id="mods"></div>
   </div>
 </div>
 
 <script>
 (()=>{
 const TYPES=[
- {id:'laser', name:'レーザー',   color:'#ff4d6d', desc:'1列を一瞬撃つ。細い線が反対の端まで伸びたら発射'},
- {id:'orb',   name:'エネルギー球', color:'#ff5ad1', desc:'球が1列をゆっくり転がってくる。通り過ぎたマスへよける'},
- {id:'beam',  name:'持続ビーム', color:'#b57bff', desc:'1列を数秒ふさぎ続ける。その間は入れない'},
- {id:'panel', name:'封鎖パネル', color:'#ff9440', desc:'角の枠が閉じると床が熱くなり、数秒そのマスに入れない'},
+ {id:'laser', name:'レーザー',     color:'#ff4d6d', desc:'1列を一瞬撃つ。細い線が伸び切ったら発射。柱で止まる'},
+ {id:'orb',   name:'エネルギー球', color:'#ff5ad1', desc:'1列をゆっくり転がる。当たるのは球のいるマスだけ。柱で壊れる'},
+ {id:'beam',  name:'持続ビーム',   color:'#b57bff', desc:'1列を数秒ふさぐ。その間は入れない。柱で止まる'},
+ {id:'panel', name:'封鎖パネル',   color:'#ff9440', desc:'角の枠が閉じると床が熱くなり、数秒入れない'},
  {id:'sweep', name:'掃引レーザー', color:'#ff4d6d', desc:'番号の順に1列ずつ撃つ。撃ち終わった列へ逃げる'},
  {id:'drone', name:'照準ドローン', color:'#ffd43b', desc:'照準が自分を追い、止まってから撃つ。止まったら外す'},
- {id:'pulse', name:'パルス',     color:'#7dff9a', desc:'中心から輪が外へ広がる。撃ち終わった内側へ戻る'},
+ {id:'pulse', name:'パルス',       color:'#7dff9a', desc:'中心から輪が外へ広がる。撃ち終わった内側へ戻る'},
 ];
-const TMAP=Object.fromEntries(TYPES.map(t=>[t.id,t])), NT=TYPES.length;
+const TMAP=Object.fromEntries(TYPES.map(t=>[t.id,t]));
+const MODS=[
+ {id:'shield',name:'防護シールド',desc:'1回だけ当たっても耐える。重ねて持てる'},
+ {id:'eye',   name:'予測センサー',desc:'予告が 15% 長く見える'},
+ {id:'dodge', name:'緊急回避',    desc:'当たる瞬間、隣の安全なマスへ自動で逃げる（区画ごとに1回）'},
+ {id:'key',   name:'出口の解析',  desc:'出口が開くまでの時間が 25% 短い'},
+ {id:'cool',  name:'冷却装置',    desc:'持続ビームと封鎖パネルが 40% 早く消える'},
+ {id:'armor', name:'重装甲',      desc:'シールドを2つ得る。ただし予告が 10% 短くなる'},
+];
+const MMAP=Object.fromEntries(MODS.map(m=>[m.id,m]));
 const $=s=>document.querySelector(s);
 const cv=$('#cv'),ctx=cv.getContext('2d'),stage=$('#stage');
+$('#legend').innerHTML=TYPES.map(t=>`<li><b style="color:${t.color}">${t.name}</b>：${t.desc}</li>`).join('')+
+  '<li><b style="color:#9fb8c8">柱</b>：入れない。レーザー・球・ビームを止めるので、陰に隠れられる</li><li><b style="color:var(--exit)">出口</b>：開いたらそこへ行くと区画を突破</li>';
 
-// ---- 設定 ----
-const cfg={size:'grow',ctrl:'drag',mode:'phase',types:{laser:true,beam:true,panel:true,sweep:true,drone:true,pulse:true}};
-try{const s=JSON.parse(localStorage.getItem('gdlab-cfg')||'null'); if(s) Object.assign(cfg,s);}catch(e){}
-for(const t of TYPES) if(cfg.types[t.id]===undefined) cfg.types[t.id]=true;
-function saveCfg(){try{localStorage.setItem('gdlab-cfg',JSON.stringify(cfg));}catch(e){}}
-const NOTES={
- size:{'3':'今と同じ 3×3。','4':'4×4 で固定。','5':'5×5 で固定。','grow':'3×3 から始まり、24 秒で 4×4、48 秒で 5×5 に区画が広がる。'},
- ctrl:{drag:'画面のどこでもフリック。1回のフリックで動くのは1マスだけで、次は指を離してから。両手の指で交互にフリックしてもよい。',tap:'行きたいマスをタップ。1マスずつ滑って動く（途中のマスでも当たる）。'},
- mode:{phase:'12 秒ごとに新しい障害が1つ加わる。84 秒からは全部が混ざる。',pick:'選んだ障害だけが出る。難しさは時間で上がる。'}
-};
-function renderCfg(){
-  document.querySelectorAll('.seg').forEach(seg=>{const k=seg.dataset.k; seg.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',String(cfg[k]===b.dataset.v)));});
-  $('#sizeNote').textContent=NOTES.size[cfg.size]; $('#ctrlNote').textContent=NOTES.ctrl[cfg.ctrl]; $('#modeNote').textContent=NOTES.mode[cfg.mode];
-  $('#chips').hidden=cfg.mode!=='pick';
-  $('#chips').querySelectorAll('.chip').forEach(c=>c.setAttribute('aria-pressed',String(!!cfg.types[c.dataset.t])));
-  $('#foot').textContent=(cfg.ctrl==='drag'?'A フリック：1回で1マス、次は指を離してから':'B タップ：行きたいマスをタップ')+'　／　キーは矢印・WASD　（試作 v5）';
-  updateBest();
-}
-document.querySelectorAll('.seg').forEach(seg=>seg.addEventListener('click',e=>{const b=e.target.closest('button'); if(!b)return; cfg[seg.dataset.k]=b.dataset.v; saveCfg(); renderCfg();}));
-$('#chips').innerHTML=TYPES.map(t=>`<button class="chip" data-t="${t.id}"><i style="background:${t.color}"></i>${t.name}</button>`).join('');
-$('#chips').addEventListener('click',e=>{const c=e.target.closest('.chip'); if(!c)return; const on=!cfg.types[c.dataset.t];
-  if(!on && Object.values(cfg.types).filter(Boolean).length<=1) return; cfg.types[c.dataset.t]=on; saveCfg(); renderCfg();});
-$('#legend').innerHTML=TYPES.map(t=>`<li><b style="color:${t.color}">${t.name}</b>：${t.desc}</li>`).join('');
-
-function bestKey(){return 'gdlab-best-'+cfg.size+'-'+cfg.ctrl+'-'+(cfg.mode==='phase'?'phase':TYPES.filter(t=>cfg.types[t.id]).map(t=>t.id).join('.'));}
-function getBest(){try{return +localStorage.getItem(bestKey())||0;}catch(e){return 0;}}
-function updateBest(){const b=getBest(); $('#best').textContent=b?'最高 '+b.toFixed(1)+'秒':'最高 —';}
+function getBest(){try{return +localStorage.getItem('gdlab-run-best')||0;}catch(e){return 0;}}
+function setBest(v){try{localStorage.setItem('gdlab-run-best',String(v));}catch(e){}}
+function showBest(){const b=getBest(); $('#bestNote').textContent=b?'これまでの最高：区画 '+b+' まで突破':'';}
+showBest();
 
 // ---- 音 ----
 let AC=null,muted=false;
@@ -166,9 +146,9 @@ function beep(f,d,type,v,slide){ if(muted||!AC)return; const t=AC.currentTime,o=
   o.type=type||'square'; o.frequency.setValueAtTime(f,t); if(slide)o.frequency.exponentialRampToValueAtTime(slide,t+d);
   g.gain.setValueAtTime(v||.04,t); g.gain.exponentialRampToValueAtTime(.0001,t+d); o.connect(g).connect(AC.destination); o.start(t); o.stop(t+d+.02);}
 
-// ---- 画面の寸法 ----
-let W=0,H=0,DPR=1,N=3,S=0,BX=0,BY=0,GAP=4,CS=0;
-function layout(){const m=Math.max(44,Math.min(W,H)*.11); S=Math.max(120,Math.min(W-2*m,H-2*m)); BX=(W-S)/2; BY=(H-S)/2; GAP=Math.max(3,S*.014); CS=(S-GAP*(N-1))/N;}
+// ---- 寸法 ----
+let W=0,H=0,DPR=1,N=4,S=0,BX=0,BY=0,GAP=4,CS=0;
+function layout(){const m=Math.max(44,Math.min(W,H)*.11); S=Math.max(120,Math.min(W-2*m,H-2*m)); BX=(W-S)/2; BY=(H-S)/2; GAP=Math.max(2,S*.012); CS=(S-GAP*(N-1))/N;}
 function resize(){const r=stage.getBoundingClientRect(); DPR=Math.min(2,window.devicePixelRatio||1); W=r.width; H=r.height;
   cv.width=Math.round(W*DPR); cv.height=Math.round(H*DPR); layout();}
 new ResizeObserver(resize).observe(stage);
@@ -176,82 +156,139 @@ const cx=x=>BX+x*(CS+GAP), cy=y=>BY+y*(CS+GAP);
 const clamp=(v,a=0,b=1)=>Math.max(a,Math.min(b,v));
 const lerp=(a,b,t)=>a+(b-a)*t;
 const ri=n=>Math.floor(Math.random()*n);
+const shuffle=a=>{for(let i=a.length-1;i>0;i--){const j=ri(i+1);[a[i],a[j]]=[a[j],a[i]];}return a;};
 
-// ---- ゲームの状態 ----
+// ---- 区画の形 ----
+// 0=穴（床が無い） 1=床 2=柱
+let M=[];
+const at=(x,y)=>(x>=0&&y>=0&&x<N&&y<N)?M[y*N+x]:0;
+const walk=(x,y)=>at(x,y)===1;
+function floors(){const a=[];for(let y=0;y<N;y++)for(let x=0;x<N;x++)if(M[y*N+x]===1)a.push([x,y]);return a;}
+function connected(m,n){let start=-1,cnt=0;for(let i=0;i<m.length;i++)if(m[i]===1){cnt++;if(start<0)start=i;}
+  if(start<0)return false; const seen=new Set([start]),q=[start];
+  while(q.length){const i=q.pop(),x=i%n,y=(i/n)|0; for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){const nx=x+dx,ny=y+dy,j=ny*n+nx;
+    if(nx>=0&&ny>=0&&nx<n&&ny<n&&m[j]===1&&!seen.has(j)){seen.add(j);q.push(j);}}}
+  return seen.size===cnt;}
+const SHAPES=[
+ {name:'正方形', ok:n=>true, f:(x,y,n)=>1},
+ {name:'十字', ok:n=>n>=4, f:(x,y,n)=>{const b=Math.ceil(n/2),lo=Math.floor((n-b)/2);return (x>=lo&&x<lo+b)||(y>=lo&&y<lo+b)?1:0;}},
+ {name:'輪', ok:n=>n>=5, f:(x,y,n)=>{const c=n-4,lo=2;return (x>=lo&&x<lo+c&&y>=lo&&y<lo+c)?0:1;}},
+ {name:'L字', ok:n=>n>=4, f:(x,y,n)=>{const h=Math.ceil(n/2);return (x>=h&&y<n-h)?0:1;}},
+ {name:'2つの部屋', ok:n=>n>=5, f:(x,y,n)=>{const a=Math.ceil(n*.4),m=Math.floor(n/2);return (x<a||x>=n-a||y===m)?1:0;}},
+ {name:'H字', ok:n=>n>=5, f:(x,y,n)=>{const a=Math.max(1,Math.floor(n/3)),m=Math.floor(n/2);return (x<a||x>=n-a||y===m||y===m-1+(n%2))?1:0;}},
+ {name:'不定形', ok:n=>true, f:null},
+];
+function genRoom(k){
+  const n=Math.min(8,3+k);
+  for(let tries=0;tries<200;tries++){
+    const pool=SHAPES.filter(s=>s.ok(n)&&(k>1||s.name!=='不定形')); const sh=k===1?SHAPES[0]:pool[ri(pool.length)];
+    let m=new Array(n*n).fill(0);
+    if(sh.f){for(let y=0;y<n;y++)for(let x=0;x<n;x++)m[y*n+x]=sh.f(x,y,n);}
+    else{const goal=Math.round(n*n*lerp(.6,.75,Math.random())); const c=Math.floor(n/2); m[c*n+c]=1; let cnt=1;
+      while(cnt<goal){const fl=[];for(let i=0;i<m.length;i++)if(m[i]===1)fl.push(i); const i=fl[ri(fl.length)],x=i%n,y=(i/n)|0;
+        const [dx,dy]=[[1,0],[-1,0],[0,1],[0,-1]][ri(4)],nx=x+dx,ny=y+dy; if(nx>=0&&ny>=0&&nx<n&&ny<n&&!m[ny*n+nx]){m[ny*n+nx]=1;cnt++;}}}
+    // 穴を少し空ける
+    const holes=k===1?0:ri(Math.floor(n*n*.07)+1);
+    for(let h=0,g=0;h<holes&&g<50;g++){const i=ri(n*n); if(m[i]!==1)continue; m[i]=0; if(!connected(m,n))m[i]=1; else h++;}
+    // 柱
+    const pil=k===1?0:Math.min(5,ri(Math.floor(n/2))+(n>=6?1:0));
+    for(let p=0,g=0;p<pil&&g<60;g++){const i=ri(n*n),x=i%n,y=(i/n)|0; if(m[i]!==1||x===0||y===0||x===n-1||y===n-1)continue;
+      m[i]=2; if(!connected(m,n))m[i]=1; else p++;}
+    const fc=m.filter(v=>v===1).length;
+    if(fc>=Math.max(8,n*n*.45)&&connected(m,n))return {n,m,name:sh.name};
+  }
+  return {n,m:new Array(n*n).fill(1),name:'正方形'};
+}
+
+// ---- 状態 ----
 let G=null;
-function startGame(){
+const mods=()=>G.mods;
+const cnt=id=>G.mods[id]||0;
+function startRun(){
   if(!AC){try{AC=new (window.AudioContext||window.webkitAudioContext)();}catch(e){}} else if(AC.state==='suspended')AC.resume();
-  N=cfg.size==='grow'?3:+cfg.size; layout();
-  const m=Math.floor(N/2);
-  G={T:0,alive:true,px:m,py:m,vx:m,vy:m,hz:[],nextSpawn:.8,noSpawnUntil:0,phase:-1,path:[],stepT:0,shake:0,flash:0,bump:null,expand:0,dieT:0,cause:null,gid:0};
-  bannerQ.length=0; bannerT=0; $('#ov').hidden=true; beep(660,.12,'sine',.05,990);
+  G={room:0,mods:{},shields:0,totalT:0,alive:true,state:'play',T:0,hz:[],gid:0,shake:0,flash:0,bump:null,inv:0,cause:null};
+  $('#ovStart').hidden=true; $('#ovPick').hidden=true; $('#result').hidden=false; enterRoom(1);
 }
-function diff(){return clamp(.2+G.T/75);}
-function warnTime(){return lerp(1.0,.5,diff());}
-function allowed(){
-  if(cfg.mode==='phase'){const k=Math.min(NT,Math.floor(G.T/12)); return TYPES.slice(0,Math.min(NT,k+1)).map(t=>t.id);}
-  return TYPES.filter(t=>cfg.types[t.id]).map(t=>t.id);
+function enterRoom(k){
+  const r=genRoom(k); N=r.n; M=r.m; layout();
+  const fl=floors(), c=(N-1)/2; fl.sort((a,b)=>(Math.abs(a[0]-c)+Math.abs(a[1]-c))-(Math.abs(b[0]-c)+Math.abs(b[1]-c)));
+  Object.assign(G,{room:k,shapeName:r.name,state:'play',T:0,hz:[],px:fl[0][0],py:fl[0][1],vx:fl[0][0],vy:fl[0][1],
+    exit:null,exitAt:Math.min(22,12+k*1.5)*Math.pow(.75,cnt('key')),nextSpawn:.9,dodges:cnt('dodge'),inv:0,enter:1});
+  bannerQ.length=0; bannerT=0;
+  const t=TYPES[Math.min(TYPES.length-1,k)];
+  if(k===1)banner('区画 1：'+N+'×'+N,'レーザーとエネルギー球。出口が開くまで生き延びる');
+  else if(k<TYPES.length)banner('区画 '+k+'：新しい試験 '+t.name,t.desc);
+  else banner('区画 '+k+'：'+r.name+' '+N+'×'+N,'すべての試験が混ざる');
+  beep(330,.3,'sine',.05,880);
 }
-const has=(h,x,y)=>h.cells.some(c=>c[0]===x&&c[1]===y);
+function diff(){return clamp(.12+(G.room-1)*.1+G.T/45);}
+function warnMul(){return Math.pow(1.15,cnt('eye'))*Math.pow(.9,cnt('armor'));}
+function warnTime(){return lerp(1.0,.5,diff())*warnMul();}
+function allowed(){return TYPES.slice(0,Math.min(TYPES.length,G.room+1)).map(t=>t.id);}
 function active(h,t){return t>=h.tf&&t<h.te;}
-function blockedAt(x,y,t){return G.hz.some(h=>h.blocks&&active(h,t)&&has(h,x,y));}
-function inside(x,y){return x>=0&&y>=0&&x<N&&y<N;}
+const has=(cells,x,y)=>cells.some(c=>c[0]===x&&c[1]===y);
+function blockedAt(x,y,t){return G.hz.some(h=>h.blocks&&active(h,t)&&has(h.cells,x,y));}
+function canEnter(x,y,t){return walk(x,y)&&!blockedAt(x,y,t);}
 
 function tryMove(dx,dy){
-  if(!G||!G.alive)return false;
+  if(!G||G.state!=='play')return false;
   const nx=G.px+dx,ny=G.py+dy;
-  if(!inside(nx,ny)||blockedAt(nx,ny,G.T)){G.bump={dx,dy,t:G.T}; beep(140,.06,'square',.025); return false;}
+  if(!canEnter(nx,ny,G.T)){G.bump={dx,dy,t:G.T}; beep(140,.06,'square',.025); return false;}
   G.px=nx;G.py=ny; beep(520+ri(60),.04,'triangle',.03); return true;
 }
 
-// ---- 障害を作る ----
-function lineCells(axis,idx){const a=[];for(let i=0;i<N;i++)a.push(axis==='row'?[i,idx]:[idx,i]);return a;}
-function mkLine(type,axis,idx,t0,tf,dur,side,extra){return Object.assign({type,axis,idx,side,cells:lineCells(axis,idx),t0,tf,te:tf+dur,blocks:type==='beam'},extra||{});}
+// ---- 障害 ----
+// 線の通り道：発射口から順に。柱で止まる。穴は通り抜ける（当たる床が無い）
+function travel(axis,idx,side){const p=[];let stop=false;
+  for(let i=0;i<N;i++){const j=side?N-1-i:i, c=axis==='row'?[j,idx]:[idx,j]; if(at(c[0],c[1])===2){stop=true;break;} p.push(c);}
+  return {path:p,stop};}
+function lineOk(axis,idx,side){return travel(axis,idx,side).path.some(c=>walk(c[0],c[1]));}
+function pickLine(){
+  for(let g=0;g<20;g++){const axis=Math.random()<.5?'row':'col', side=ri(2), aim=axis==='row'?G.py:G.px, idx=Math.random()<.65?aim:ri(N);
+    if(lineOk(axis,idx,side))return {axis,idx,side};}
+  return null;}
+function mkLine(type,L,t0,tf,dur,extra){const tr=travel(L.axis,L.idx,L.side);
+  return Object.assign({type,axis:L.axis,idx:L.idx,side:L.side,path:tr.path,stop:tr.stop,cells:tr.path.filter(c=>walk(c[0],c[1])),t0,tf,te:tf+dur,blocks:type==='beam'},extra||{});}
+function randFloor(){const f=floors();return f[ri(f.length)];}
 function build(type){
-  const T=G.T,w=warnTime(),d=diff(),gid=++G.gid;
-  const axis=Math.random()<.5?'row':'col', aim=axis==='row'?G.py:G.px, side=ri(2);
-  const pick=()=>Math.random()<.65?aim:ri(N);
-  if(type==='laser') return [mkLine('laser',axis,pick(),T,T+w,.16,side,{gid})];
-  if(type==='orb'){const per=lerp(.62,.34,d), tf=T+w*.9; return [{type:'orb',axis,idx:pick(),side,cells:[],t0:T,tf,per,te:tf+(N+1.2)*per,blocks:false,gid}];}
-  if(type==='beam')  return [mkLine('beam',axis,pick(),T,T+w*1.1,2.3+Math.random()*1.1,side,{gid})];
+  const T=G.T,w=warnTime(),d=diff(),gid=++G.gid,cool=Math.pow(.6,cnt('cool'));
+  if(type==='laser'){const L=pickLine(); return L&&[mkLine('laser',L,T,T+w,.16,{gid})];}
+  if(type==='orb'){const L=pickLine(); if(!L)return null; const per=lerp(.62,.34,d), tf=T+w*.9; const h=mkLine('orb',L,T,tf,0,{gid,per,blocks:false}); h.te=tf+(h.path.length+.7)*per; h.cells=[]; return [h];}
+  if(type==='beam'){const L=pickLine(); return L&&[mkLine('beam',L,T,T+w*1.1,(2.3+Math.random()*1.1)*cool,{gid})];}
   if(type==='panel'){
-    const cells=[]; const first=Math.random()<.6?[G.px,G.py]:[ri(N),ri(N)]; cells.push(first);
-    const k=N>=4&&d>.35?2:1;
-    while(cells.length<k){const c=[ri(N),ri(N)]; if(!cells.some(e=>e[0]===c[0]&&e[1]===c[1]))cells.push(c);}
-    return [{type:'panel',cells,t0:T,tf:T+w*1.05,te:T+w*1.05+2.4+Math.random(),blocks:true,gid}];
+    const cells=[Math.random()<.6?[G.px,G.py]:randFloor()]; const k=N>=5&&d>.35?2:1;
+    for(let g=0;cells.length<k&&g<20;g++){const c=randFloor(); if(!has(cells,c[0],c[1]))cells.push(c);}
+    return [{type:'panel',cells,t0:T,tf:T+w*1.05,te:T+w*1.05+(2.4+Math.random())*cool,blocks:true,gid}];
   }
   if(type==='sweep'){
-    const dir=ri(2)?1:-1, iv=lerp(.52,.36,d), out=[];
-    for(let i=0;i<N;i++){const idx=dir>0?i:N-1-i; out.push(mkLine('sweep',axis,idx,T,T+w+i*iv,.16,side,{gid,order:i+1}));}
-    return out;
+    const axis=Math.random()<.5?'row':'col', dir=ri(2)?1:-1, side=ri(2), iv=lerp(.5,.34,d), out=[]; let o=0;
+    for(let i=0;i<N;i++){const idx=dir>0?i:N-1-i; if(!lineOk(axis,idx,side))continue; out.push(mkLine('sweep',{axis,idx,side},T,T+w+o*iv,.16,{gid,order:o+1})); o++;}
+    return out.length?out:null;
   }
-  if(type==='drone'){
-    const tl=T+.95, tf=tl+Math.max(.36,w*.6);
-    return [{type:'drone',cells:[[G.px,G.py]],t0:T,tl,tf,te:tf+.16,rx:cx(G.px)+CS/2,ry:cy(G.py)+CS/2,gid}];
-  }
+  if(type==='drone'){const tl=T+.95, tf=tl+Math.max(.36,w*.6);
+    return [{type:'drone',cells:[[G.px,G.py]],t0:T,tl,tf,te:tf+.16,rx:cx(G.px)+CS/2,ry:cy(G.py)+CS/2,gid}];}
   if(type==='pulse'){
-    const c=Math.random()<.6?[G.px,G.py]:[ri(N),ri(N)], out=[];
-    for(let r=0;r<N;r++){const cells=[];for(let x=0;x<N;x++)for(let y=0;y<N;y++)if(Math.max(Math.abs(x-c[0]),Math.abs(y-c[1]))===r)cells.push([x,y]);
+    const c=Math.random()<.6?[G.px,G.py]:randFloor(), out=[];
+    for(let r=0;r<N;r++){const cells=[];for(const f of floors())if(Math.max(Math.abs(f[0]-c[0]),Math.abs(f[1]-c[1]))===r)cells.push(f);
       if(cells.length) out.push({type:'pulse',cells,r,center:c,t0:T,tf:T+w+r*.3,te:T+w+r*.3+.15,blocks:false,gid});}
     return out;
   }
 }
 function orbU(h,t){return (t-h.tf)/h.per-.6;}
-function orbCell(h,t){const k=Math.round(orbU(h,t)); if(k<0||k>=N)return null; const i=h.side?N-1-k:k; return h.axis==='row'?[i,h.idx]:[h.idx,i];}
+function orbCell(h,t){const k=Math.round(orbU(h,t)); if(k<0||k>=h.path.length)return null; const c=h.path[k]; return walk(c[0],c[1])?c:null;}
 function cellsAt(h,t){if(h.type!=='orb')return h.cells; const c=orbCell(h,t); return c?[c]:[];}
 function dangerSet(list,t){const s=new Set();for(const h of list)if(active(h,t))for(const c of cellsAt(h,t))s.add(c[0]+','+c[1]);return s;}
 function fair(cands){
-  const all=G.hz.concat(cands), needBlock=cands.some(c=>c.blocks);
-  const times=[]; for(const c of cands){times.push(c.tf+.02); if(c.blocks)times.push((c.tf+c.te)/2,c.te-.03); if(c.type==='orb')for(let k=0;k<N;k++)times.push(c.tf+c.per*(k+.6));}
-  for(const t of times){const ds=dangerSet(all,t); if(N*N-ds.size<(needBlock?2:1))return false;}
-  // 最初に撃つ時までに、動ける範囲に安全なマスがあるか
+  const all=G.hz.concat(cands), needBlock=cands.some(c=>c.blocks), fc=floors().length;
+  const times=[]; for(const c of cands){times.push(c.tf+.02); if(c.blocks)times.push((c.tf+c.te)/2,c.te-.03); if(c.type==='orb')for(let k=0;k<c.path.length;k++)times.push(c.tf+c.per*(k+.6));}
+  for(const t of times){const ds=dangerSet(all,t); if(fc-ds.size<(needBlock?3:2))return false;}
   for(const c of cands){
     const steps=Math.max(1,Math.floor((c.tf-G.T)/.17));
     const ds=dangerSet(all,c.tf+.02), ds2=dangerSet(all,c.tf+.12);
     const seen=new Set([G.px+','+G.py]); let q=[[G.px,G.py]], ok=false;
     for(let s=0;s<=steps&&q.length&&!ok;s++){const nq=[];
       for(const [x,y] of q){const k=x+','+y; if(!ds.has(k)&&!ds2.has(k)){ok=true;break;}
-        for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){const nx=x+dx,ny=y+dy,nk=nx+','+ny; if(inside(nx,ny)&&!seen.has(nk)&&!blockedAt(nx,ny,G.T)){seen.add(nk);nq.push([nx,ny]);}}}
+        for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){const nx=x+dx,ny=y+dy,nk=nx+','+ny; if(canEnter(nx,ny,G.T)&&!seen.has(nk)){seen.add(nk);nq.push([nx,ny]);}}}
       q=nq;}
     if(!ok)return false;
   }
@@ -259,117 +296,144 @@ function fair(cands){
 }
 function spawn(){
   const T=G.T,d=diff();
-  if(T<G.nextSpawn||T<G.noSpawnUntil)return;
+  if(T<G.nextSpawn)return;
   const live=new Set(G.hz.filter(h=>h.te>T).map(h=>h.gid)).size;
-  const maxC=d<.3?1:d<.6?2:3;
+  const maxC=(d<.3?1:d<.6?2:3)+(N>=7?1:0);
   if(live>=maxC){G.nextSpawn=T+.15;return;}
-  const al=allowed(); let type;
-  if(cfg.mode==='phase'&&G.T<NT*12&&al.length>1&&Math.random()<.45) type=al[al.length-1]; else type=al[ri(al.length)];
-  for(let i=0;i<10;i++){const c=build(type); if(fair(c)){G.hz.push(...c); beep(type==='drone'?880:330,.08,'sine',.03); break;}}
-  const extra=(type==='sweep'||type==='pulse')?.7:0;
-  G.nextSpawn=T+lerp(1.2,.55,d)*(.8+Math.random()*.4)+extra;
+  const al=allowed(); let type=(G.room<TYPES.length&&Math.random()<.4)?al[al.length-1]:al[ri(al.length)];
+  for(let i=0;i<10;i++){const c=build(type); if(c&&c.length&&fair(c)){G.hz.push(...c); beep(type==='drone'?880:330,.08,'sine',.03); break;}}
+  G.nextSpawn=T+lerp(1.2,.55,d)*(N>=7?.85:1)*(.8+Math.random()*.4)+((type==='sweep'||type==='pulse')?.6:0);
 }
 
 // ---- 知らせ ----
 const bannerQ=[]; let bannerT=0;
 function banner(b,s){bannerQ.push([b,s]);}
-function tickBanner(dt){
-  const el=$('#banner div');
+function tickBanner(dt){const el=$('#banner div');
   if(bannerT>0){bannerT-=dt; if(bannerT<=0)el.classList.add('off'); return;}
-  if(bannerQ.length){const [b,s]=bannerQ.shift(); el.querySelector('b').textContent=b; el.querySelector('span').textContent=s; el.classList.remove('off'); bannerT=2.6;}
-}
+  if(bannerQ.length){const [b,s]=bannerQ.shift(); el.querySelector('b').textContent=b; el.querySelector('span').textContent=s; el.classList.remove('off'); bannerT=2.6;}}
 
 // ---- 進める ----
+function openExit(){
+  // 今いる所から遠い床を出口にする
+  const dist=new Map([[G.px+','+G.py,0]]); let q=[[G.px,G.py]];
+  while(q.length){const nq=[];for(const [x,y] of q)for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){const nx=x+dx,ny=y+dy,k=nx+','+ny;
+    if(walk(nx,ny)&&!dist.has(k)){dist.set(k,dist.get(x+','+y)+1);nq.push([nx,ny]);}} q=nq;}
+  const arr=[...dist.entries()], mx=Math.max(...arr.map(e=>e[1])), far=arr.filter(e=>e[1]>=Math.max(1,Math.ceil(mx*.6)));
+  const k=far[ri(far.length)][0].split(',').map(Number); G.exit=k;
+  banner('出口が開いた','光るマスへ行けば区画を突破'); beep(660,.25,'sine',.05,1320);
+}
 function update(dt){
   if(!G)return;
-  if(!G.alive){G.dieT+=dt; return;}
-  G.T+=dt; const T=G.T;
-  if(cfg.size==='grow'){const want=T<24?3:T<48?4:5; if(want!==N)expand(want);}
-  if(cfg.mode==='phase'){const ph=Math.min(NT,Math.floor(T/12)); if(ph!==G.phase){G.phase=ph; const t=TYPES[ph];
-    if(ph<NT)banner((ph===0?'試験 1：':'新しい試験：')+t.name,t.desc); else banner('総合試験','すべての障害が混ざる');}}
-  // タップの道のり
-  if(G.path.length&&T>=G.stepT){const [x,y]=G.path[0]; if(tryMove(x-G.px,y-G.py)){G.path.shift(); G.stepT=T+.07;} else G.path=[];}
-  // 照準ドローンは止まるまで追う
+  if(G.state==='dead'||G.state==='pick'){return;}
+  if(G.state==='clear'){G.clearT+=dt; if(G.clearT>.9){G.state='pick'; showPick();} return;}
+  G.T+=dt; G.totalT+=dt; const T=G.T;
+  if(!G.exit&&T>=G.exitAt)openExit();
   for(const h of G.hz)if(h.type==='drone'){ if(T<h.tl)h.cells=[[G.px,G.py]];
     const [x,y]=h.cells[0]; const k=1-Math.exp(-dt*(T<h.tl?7:30)); h.rx+=(cx(x)+CS/2-h.rx)*k; h.ry+=(cy(y)+CS/2-h.ry)*k;}
-  // 発射の音
-  for(const h of G.hz)if(!h.fired&&T>=h.tf){h.fired=true; if(h.type==='beam'||h.type==='panel')beep(110,.35,'sawtooth',.03,90); else beep(1200,.12,'sawtooth',.025,300);}
-  for(const h of G.hz)if(h.type==='orb')h.cells=cellsAt(h,T);
-  // 当たり
-  for(const h of G.hz)if(active(h,T)&&has(h,G.px,G.py)){die(h);break;}
+  for(const h of G.hz)if(!h.fired&&T>=h.tf){h.fired=true; if(h.type==='beam'||h.type==='panel')beep(110,.35,'sawtooth',.03,90); else if(h.type!=='orb')beep(1200,.12,'sawtooth',.025,300); else beep(200,.3,'triangle',.04,120);}
+  if(G.exit&&G.px===G.exit[0]&&G.py===G.exit[1]){clearRoom();return;}
+  for(const h of G.hz)if(active(h,T)&&has(cellsAt(h,T),G.px,G.py)){hit(h);break;}
   G.hz=G.hz.filter(h=>h.te>T-.35);
-  spawn();
+  if(G.state==='play')spawn();
   const k=1-Math.exp(-dt*24); G.vx+=(G.px-G.vx)*k; G.vy+=(G.py-G.vy)*k;
 }
-function expand(n){
-  const o=N; N=n; layout();
-  G.px=Math.round(G.px*(n-1)/(o-1)); G.py=Math.round(G.py*(n-1)/(o-1)); G.vx=G.px; G.vy=G.py;
-  G.hz=[]; G.path=[]; G.noSpawnUntil=G.T+1.4; G.expand=1; banner('区画を拡張',n+'×'+n+' に広がった'); beep(330,.4,'sine',.05,880);
+function hit(h){
+  const T=G.T; if(T<G.inv)return;
+  if(G.dodges>0){
+    const ds=dangerSet(G.hz,T), ds2=dangerSet(G.hz,T+.15);
+    const c=shuffle([[1,0],[-1,0],[0,1],[0,-1]]).map(([dx,dy])=>[G.px+dx,G.py+dy]).find(([x,y])=>canEnter(x,y,T)&&!ds.has(x+','+y)&&!ds2.has(x+','+y));
+    if(c){G.dodges--; G.px=c[0]; G.py=c[1]; G.inv=T+.25; banner('緊急回避','この区画ではもう使えない'); beep(900,.15,'sine',.05,1800); return;}
+  }
+  if(G.shields>0){G.shields--; G.inv=T+1.0; G.flash=.6; G.shake=.5; banner('シールドで耐えた','残り '+G.shields); beep(300,.3,'square',.05,150); return;}
+  die(h);
 }
+function clearRoom(){
+  G.state='clear'; G.clearT=0; G.hz=[]; beep(523,.12,'sine',.05); setTimeout(()=>beep(784,.2,'sine',.05),120);
+  const b=getBest(); if(G.room>b)setBest(G.room);
+}
+function showPick(){
+  $('#pickTitle').textContent='区画 '+G.room+' を突破';
+  const opts=shuffle(MODS.slice()).slice(0,3);
+  $('#mods').innerHTML=opts.map((m,i)=>`<button class="mod" data-m="${m.id}"><small>${i+1}${cnt(m.id)?'　所持 '+cnt(m.id):''}</small><b>${m.name}</b><span>${m.desc}</span></button>`).join('');
+  $('#ovPick').hidden=false;
+}
+function takeMod(id){
+  if(!G||G.state!=='pick')return;
+  G.mods[id]=(G.mods[id]||0)+1;
+  if(id==='shield')G.shields+=1; if(id==='armor')G.shields+=2;
+  $('#ovPick').hidden=true; enterRoom(G.room+1);
+}
+$('#mods').addEventListener('click',e=>{const b=e.target.closest('.mod'); if(b)takeMod(b.dataset.m);});
 function die(h){
-  G.alive=false; G.cause=h; G.shake=1; G.flash=1; beep(220,.6,'sawtooth',.06,40);
-  const b=getBest(), nb=G.T>b; if(nb){try{localStorage.setItem(bestKey(),String(G.T));}catch(e){}}
-  setTimeout(()=>showResult(nb),900);
+  G.state='dead'; G.cause=h; G.shake=1; G.flash=1; beep(220,.6,'sawtooth',.06,40);
+  setTimeout(showResult,900);
 }
-function showResult(nb){
-  $('#result').hidden=false; $('#rTime').textContent=G.T.toFixed(1)+' 秒';
-  $('#rWhy').innerHTML='当たった障害：<b style="color:'+TMAP[G.cause.type].color+'">'+TMAP[G.cause.type].name+'</b>';
-  let ph='';
-  if(cfg.mode==='phase'){ph='試験 '+(Math.min(NT,G.phase)+1)+' まで進んだ。';
-    if(G.phase<NT){const left=(G.phase+1)*12-G.T, nx=G.phase+1<NT?'「'+TYPES[G.phase+1].name+'」':'総合試験'; ph+='次の'+nx+'まで、あと '+left.toFixed(1)+' 秒。';}}
-  $('#rSub').textContent=ph+(nb?'最高記録を更新。':'最高 '+getBest().toFixed(1)+' 秒');
-  $('#go').textContent='もう一回'; $('#ov').hidden=false; updateBest(); $('#go').focus({preventScroll:true});
+function showResult(){
+  const cleared=G.room-1, best=getBest();
+  $('#rMain').textContent='区画 '+G.room+' で停止';
+  const ms=Object.entries(G.mods).map(([k,v])=>MMAP[k].name+(v>1?'×'+v:'')).join('・')||'なし';
+  $('#rSub').innerHTML='突破 '+cleared+' 区画　／　'+G.totalT.toFixed(1)+' 秒<br>当たった障害：<b style="color:'+TMAP[G.cause.type].color+'">'+TMAP[G.cause.type].name+'</b><br>装備：'+ms+'<br>'+
+    (cleared>0&&cleared>=best?'最高記録':'最高：区画 '+best+' まで突破');
+  $('#go').textContent='もう一回'; $('#ovStart').hidden=false; showBest(); $('#go').focus({preventScroll:true});
 }
 
 // ---- 描く ----
 function rr(x,y,w,h,r){ctx.beginPath();ctx.roundRect?ctx.roundRect(x,y,w,h,r):ctx.rect(x,y,w,h);}
-function rectA(h,a0,a1,c,th){ if(h.axis==='row')ctx.fillRect(a0,c-th/2,a1-a0,th); else ctx.fillRect(c-th/2,a0,th,a1-a0);}
-function lineGeo(h){const c=(h.axis==='row'?cy(h.idx):cx(h.idx))+CS/2; const s=h.axis==='row'?BX:BY; return {c,s,e:s+S};}
-function emitterPos(h){const g=lineGeo(h),p=h.side?g.e+14:g.s-14; return h.axis==='row'?[p,g.c]:[g.c,p];}
+function glow(col,b){ctx.shadowColor=col;ctx.shadowBlur=b;}
 function hatch(x,y,col,a){ctx.save(); rr(x,y,CS,CS,4); ctx.clip(); ctx.strokeStyle=col; ctx.globalAlpha=a; ctx.lineWidth=Math.max(2,CS*.05);
   for(let i=-CS;i<CS*2;i+=CS/5){ctx.beginPath();ctx.moveTo(x+i,y);ctx.lineTo(x+i-CS,y+CS);ctx.stroke();} ctx.restore();}
+const NUMF=()=>'700 11px '+getComputedStyle(document.documentElement).getPropertyValue('--f-num');
+function lineGeo(h){const c=(h.axis==='row'?cy(h.idx):cx(h.idx))+CS/2; const s=h.axis==='row'?BX:BY; return {c,s,e:s+S};}
+// 通り道の i 番目のマスの中心（発射口の側から数える）
+function along(h,g,i){const step=CS+GAP; return h.side?g.e-i*step-CS/2:g.s+i*step+CS/2;}
+function pt(h,g,a){return h.axis==='row'?[a,g.c]:[g.c,a];}
+function emitter(h,g){return pt(h,g,h.side?g.e+16:g.s-16);}
+// 線の終わり：柱があれば柱の手前、無ければ反対の壁の外
+function lineEnd(h,g){const step=CS+GAP; if(h.stop){const i=h.path.length; return h.side?g.e-i*step+GAP/2:g.s+i*step-GAP/2;} return h.side?g.s-16:g.e+16;}
+function band(h,g,a0,a1,th){const lo=Math.min(a0,a1),hi=Math.max(a0,a1); if(h.axis==='row')ctx.fillRect(lo,g.c-th/2,hi-lo,th); else ctx.fillRect(g.c-th/2,lo,th,hi-lo);}
 
-function drawFloor(T){
-  const ex=G?G.expand:0;
-  ctx.strokeStyle='rgba(79,216,255,.28)'; ctx.lineWidth=1;
-  ctx.strokeRect(BX-8.5,BY-8.5,S+17,S+17);
-  // 発射口の箱と座標
-  ctx.font='600 10px '+getComputedStyle(document.documentElement).getPropertyValue('--f-num'); ctx.textAlign='center'; ctx.textBaseline='middle';
+function drawRoom(T){
+  const e=G?G.enter:0;
+  ctx.font=NUMF(); ctx.textAlign='center'; ctx.textBaseline='middle';
   for(let i=0;i<N;i++){
+    let rowHas=false,colHas=false; for(let j=0;j<N;j++){if(at(j,i)===1)rowHas=true; if(at(i,j)===1)colHas=true;}
     const m=cx(i)+CS/2, n=cy(i)+CS/2;
-    ctx.fillStyle='#132332';
-    ctx.fillRect(m-CS*.18,BY-20,CS*.36,6); ctx.fillRect(m-CS*.18,BY+S+14,CS*.36,6);
-    ctx.fillRect(BX-20,n-CS*.18,6,CS*.36); ctx.fillRect(BX+S+14,n-CS*.18,6,CS*.36);
-    ctx.fillStyle='rgba(111,143,163,.7)';
-    ctx.fillText('ABCDE'[i],m,BY-30); ctx.fillText(String(i+1),BX-30,n);
+    ctx.fillStyle=colHas?'#16283a':'#0c141e'; ctx.fillRect(m-CS*.2,BY-22,CS*.4,6); ctx.fillRect(m-CS*.2,BY+S+16,CS*.4,6);
+    ctx.fillStyle=rowHas?'#16283a':'#0c141e'; ctx.fillRect(BX-22,n-CS*.2,6,CS*.4); ctx.fillRect(BX+S+16,n-CS*.2,6,CS*.4);
   }
-  for(let x=0;x<N;x++)for(let y=0;y<N;y++){
-    const X=cx(x),Y=cy(y), a=ex>0?clamp(1-ex*1.3+((x+y)/(2*N))*.6):1;
-    ctx.globalAlpha=a; ctx.fillStyle='#0c1520'; rr(X,Y,CS,CS,4); ctx.fill();
-    ctx.strokeStyle='rgba(79,216,255,.22)'; ctx.stroke();
-    ctx.fillStyle='rgba(79,216,255,.35)'; const k=Math.max(4,CS*.08);
-    ctx.fillRect(X+4,Y+4,k,1.5); ctx.fillRect(X+4,Y+4,1.5,k); ctx.fillRect(X+CS-4-k,Y+CS-5.5,k,1.5); ctx.fillRect(X+CS-5.5,Y+CS-4-k,1.5,k);
+  for(let y=0;y<N;y++)for(let x=0;x<N;x++){
+    const v=at(x,y); if(!v)continue;
+    const X=cx(x),Y=cy(y); ctx.globalAlpha=e>0?clamp(1-e*1.4+((x+y)/(2*N))*.8):1;
+    if(v===1){ctx.fillStyle='#0c1520'; rr(X,Y,CS,CS,4); ctx.fill(); ctx.strokeStyle='rgba(79,216,255,.22)'; ctx.lineWidth=1; ctx.stroke();
+      ctx.fillStyle='rgba(79,216,255,.35)'; const k=Math.max(3,CS*.08);
+      ctx.fillRect(X+3,Y+3,k,1.5); ctx.fillRect(X+3,Y+3,1.5,k); ctx.fillRect(X+CS-3-k,Y+CS-4.5,k,1.5); ctx.fillRect(X+CS-4.5,Y+CS-3-k,1.5,k);}
+    else{ // 柱
+      ctx.fillStyle='#1b2c3b'; rr(X+2,Y+2,CS-4,CS-4,5); ctx.fill();
+      ctx.fillStyle='#2b4459'; rr(X+2,Y+2,CS-4,(CS-4)*.72,5); ctx.fill();
+      ctx.strokeStyle='#5d7d93'; ctx.lineWidth=1.5; rr(X+2,Y+2,CS-4,(CS-4)*.72,5); ctx.stroke();
+      ctx.fillStyle='#8fb3c8'; ctx.fillRect(X+CS*.3,Y+CS*.34,CS*.4,2);}
     ctx.globalAlpha=1;
   }
+  if(G&&G.exit){const [x,y]=G.exit,X=cx(x),Y=cy(y),p=(T*1.6)%1;
+    glow('#7dffd8',20); ctx.fillStyle='#7dffd8'; ctx.globalAlpha=.25+.15*Math.sin(T*6); rr(X,Y,CS,CS,4); ctx.fill(); ctx.shadowBlur=0; ctx.globalAlpha=1;
+    ctx.strokeStyle='#7dffd8'; ctx.lineWidth=2; for(let i=0;i<2;i++){const q=(p+i*.5)%1, o=q*CS*.4; ctx.globalAlpha=1-q; rr(X+o,Y+o,CS-2*o,CS-2*o,4); ctx.stroke();}
+    ctx.globalAlpha=1; ctx.fillStyle='#eafff9'; ctx.font='700 '+Math.max(10,CS*.2)+'px '+getComputedStyle(document.documentElement).getPropertyValue('--f-jp'); ctx.fillText('出口',X+CS/2,Y+CS/2);}
 }
-function glow(col,b){ctx.shadowColor=col;ctx.shadowBlur=b;}
 function drawHazards(T){
-  // 床に残る物（下の層）
   for(const h of G.hz){
     const col=TMAP[h.type].color, f=clamp((T-h.t0)/(h.tf-h.t0)), act=active(h,T);
     if(h.type==='panel'){
       for(const [x,y] of h.cells){const X=cx(x),Y=cy(y);
         if(T<h.tf){ctx.fillStyle=col; ctx.globalAlpha=.08+f*.22; rr(X,Y,CS,CS,4); ctx.fill(); ctx.globalAlpha=1;
-          const o=(1-f)*CS*.45, L=CS*.22; ctx.strokeStyle=col; ctx.lineWidth=3;
+          const o=(1-f)*CS*.45, L=CS*.22; ctx.strokeStyle=col; ctx.lineWidth=Math.max(2,CS*.05);
           for(const [sx,sy] of [[0,0],[1,0],[0,1],[1,1]]){const px=sx?X+CS+o:X-o, py=sy?Y+CS+o:Y-o, dx=sx?-1:1, dy=sy?-1:1;
             ctx.beginPath(); ctx.moveTo(px+dx*L,py); ctx.lineTo(px,py); ctx.lineTo(px,py+dy*L); ctx.stroke();}
-        } else if(act){ glow(col,18); ctx.fillStyle=col; ctx.globalAlpha=.75; rr(X,Y,CS,CS,4); ctx.fill(); ctx.shadowBlur=0; ctx.globalAlpha=1;
-          hatch(X,Y,'#3a1300',.5); const r=clamp((h.te-T)/(h.te-h.tf)); ctx.fillStyle='#fff'; ctx.fillRect(X+6,Y+CS-8,(CS-12)*r,3);}
+        } else if(act){glow(col,18); ctx.fillStyle=col; ctx.globalAlpha=.75; rr(X,Y,CS,CS,4); ctx.fill(); ctx.shadowBlur=0; ctx.globalAlpha=1;
+          hatch(X,Y,'#3a1300',.5); const r=clamp((h.te-T)/(h.te-h.tf)); ctx.fillStyle='#fff'; ctx.fillRect(X+5,Y+CS-7,(CS-10)*r,3);}
       }
     }
     if(h.type==='pulse'){
-      if(h.r===0&&T<h.tf){const [x,y]=h.center,X=cx(x)+CS/2,Y=cy(y)+CS/2; ctx.fillStyle=col; ctx.globalAlpha=.25+.5*f;
-        ctx.beginPath(); ctx.arc(X,Y,CS*.12+CS*.2*f,0,7); ctx.fill(); ctx.globalAlpha=1;}
+      if(h.r===0&&T<h.tf){const [x,y]=h.center,X=cx(x)+CS/2,Y=cy(y)+CS/2; ctx.fillStyle=col; ctx.globalAlpha=.25+.5*f; ctx.beginPath(); ctx.arc(X,Y,CS*.12+CS*.2*f,0,7); ctx.fill(); ctx.globalAlpha=1;}
       if(T<h.tf&&h.r>0){ctx.strokeStyle=col; ctx.globalAlpha=.25+.35*f; ctx.setLineDash([4,4]); ctx.lineWidth=1.5;
         for(const [x,y] of h.cells){rr(cx(x)+3,cy(y)+3,CS-6,CS-6,4); ctx.stroke();} ctx.setLineDash([]); ctx.globalAlpha=1;}
       if(act){glow(col,16); ctx.fillStyle=col; ctx.globalAlpha=.8; for(const [x,y] of h.cells){rr(cx(x),cy(y),CS,CS,4); ctx.fill();} ctx.shadowBlur=0; ctx.globalAlpha=1;}
@@ -377,44 +441,46 @@ function drawHazards(T){
     if(h.type==='beam'&&act){for(const [x,y] of h.cells)hatch(cx(x),cy(y),col,.35);}
   }
   // エネルギー球
-  for(const h of G.hz){
-    if(h.type!=='orb')continue;
-    const col=TMAP.orb.color, g=lineGeo(h), [ex,ey]=emitterPos(h), step=CS+GAP;
+  for(const h of G.hz){ if(h.type!=='orb')continue;
+    const col=TMAP.orb.color, g=lineGeo(h), [ex,ey]=emitter(h,g);
     if(T<h.tf){const f=clamp((T-h.t0)/(h.tf-h.t0));
-      ctx.fillStyle=col; ctx.globalAlpha=.05+.1*f; rectA(h,g.s,g.e,g.c,CS);
-      ctx.globalAlpha=.7; for(let k=0;k<N;k++){const a=h.side?g.e-k*step-CS/2:g.s+k*step+CS/2; const [x,y]=h.axis==='row'?[a,g.c]:[g.c,a]; ctx.beginPath(); ctx.arc(x,y,2.5,0,7); ctx.fill();}
+      ctx.fillStyle=col; ctx.globalAlpha=.06+.1*f; for(const c of h.cells){rr(cx(c[0]),cy(c[1]),CS,CS,4); ctx.fill();}
+      ctx.globalAlpha=.75; h.path.forEach((c,i)=>{const [x,y]=pt(h,g,along(h,g,i)); ctx.beginPath(); ctx.arc(x,y,2.5,0,7); ctx.fill();});
+      if(h.stop){const [x,y]=pt(h,g,lineEnd(h,g)); ctx.fillRect(x-3,y-3,6,6);}
       ctx.globalAlpha=1; glow(col,6+12*f); ctx.beginPath(); ctx.arc(ex,ey,CS*.1+CS*.12*f,0,7); ctx.fill(); ctx.shadowBlur=0; continue;}
     if(T>=h.te)continue;
-    const u=orbU(h,T), pos=a=>h.side?g.e-a*step-CS/2:g.s+a*step+CS/2;
+    const u=orbU(h,T); if(h.stop&&u>h.path.length-.5){const [x,y]=pt(h,g,lineEnd(h,g)),q=clamp((u-h.path.length+.5)/1.2);
+      ctx.strokeStyle=col; ctx.globalAlpha=1-q; ctx.lineWidth=3; ctx.beginPath(); ctx.arc(x,y,CS*.2+q*CS*.4,0,7); ctx.stroke(); ctx.globalAlpha=1; continue;}
     const c=orbCell(h,T); if(c){ctx.fillStyle=col; ctx.globalAlpha=.22; rr(cx(c[0]),cy(c[1]),CS,CS,4); ctx.fill(); ctx.globalAlpha=1;}
-    for(let i=3;i>=0;i--){const a=pos(u-i*.18), [x,y]=h.axis==='row'?[a,g.c]:[g.c,a];
-      ctx.globalAlpha=i?.18/i:1; if(!i)glow(col,22); ctx.fillStyle=i?col:'#ffe6f7'; ctx.beginPath(); ctx.arc(x,y,CS*.26*(1-i*.12),0,7); ctx.fill(); ctx.shadowBlur=0;}
-    const a=pos(u),[x,y]=h.axis==='row'?[a,g.c]:[g.c,a]; ctx.globalAlpha=1; ctx.strokeStyle=col; ctx.lineWidth=3; ctx.beginPath(); ctx.arc(x,y,CS*.26,0,7); ctx.stroke();
+    for(let i=3;i>=0;i--){const [x,y]=pt(h,g,along(h,g,u-i*.18)); ctx.globalAlpha=i?.18/i:1; if(!i)glow(col,22); ctx.fillStyle=i?col:'#ffe6f7';
+      ctx.beginPath(); ctx.arc(x,y,CS*.26*(1-i*.12),0,7); ctx.fill(); ctx.shadowBlur=0;}
+    const [x,y]=pt(h,g,along(h,g,u)); ctx.globalAlpha=1; ctx.strokeStyle=col; ctx.lineWidth=3; ctx.beginPath(); ctx.arc(x,y,CS*.26,0,7); ctx.stroke();
   }
   // 線の障害
   for(const h of G.hz){
     if(h.type!=='laser'&&h.type!=='beam'&&h.type!=='sweep')continue;
-    const col=TMAP[h.type].color, f=clamp((T-h.t0)/(h.tf-h.t0)), g=lineGeo(h), [ex,ey]=emitterPos(h);
+    const col=TMAP[h.type].color, f=clamp((T-h.t0)/(h.tf-h.t0)), g=lineGeo(h), [ex,ey]=emitter(h,g), a0=h.side?g.e+16:g.s-16, a1=lineEnd(h,g);
     if(T<h.tf){
-      ctx.fillStyle=col; ctx.globalAlpha=.05+.12*f; rectA(h,g.s,g.e,g.c,CS); ctx.globalAlpha=.9;
-      const len=(S+28)*f; if(h.side)rectA(h,g.e+14-len,g.e+14,g.c,2); else rectA(h,g.s-14,g.s-14+len,g.c,2);
+      ctx.fillStyle=col; ctx.globalAlpha=.06+.12*f; for(const c of h.cells){rr(cx(c[0]),cy(c[1]),CS,CS,4); ctx.fill();}
+      ctx.globalAlpha=.9; band(h,g,a0,lerp(a0,a1,f),2);
+      if(h.stop){const [x,y]=pt(h,g,a1); ctx.globalAlpha=.5; ctx.fillRect(x-4,y-4,8,8);}
       ctx.globalAlpha=1; glow(col,8+10*f); ctx.beginPath(); ctx.arc(ex,ey,3+4*f,0,7); ctx.fill(); ctx.shadowBlur=0;
-      if(h.order){ctx.fillStyle='#fff'; ctx.font='700 11px '+getComputedStyle(document.documentElement).getPropertyValue('--f-num'); ctx.textAlign='center'; ctx.textBaseline='middle';
-        const o=h.side?-1:1; if(h.axis==='row')ctx.fillText(h.order,ex,ey-12); else ctx.fillText(h.order,ex-12,ey); }
+      if(h.order){ctx.fillStyle='#fff'; ctx.font=NUMF(); ctx.textAlign='center'; ctx.textBaseline='middle'; if(h.axis==='row')ctx.fillText(h.order,ex,ey-12); else ctx.fillText(h.order,ex-12,ey);}
     } else if(T<h.te){
       const th=h.type==='beam'?CS*.62:CS*.42, fade=h.type==='beam'?clamp((h.te-T)/.4):1;
-      glow(col,24); ctx.fillStyle=col; ctx.globalAlpha=.85*(.5+.5*fade); rectA(h,g.s-14,g.e+14,g.c,th*fade+2);
-      ctx.shadowBlur=0; ctx.fillStyle='#fff'; ctx.globalAlpha=.9; rectA(h,g.s-14,g.e+14,g.c,Math.max(2,th*.22*fade)); ctx.globalAlpha=1;
-    } else { ctx.fillStyle=col; ctx.globalAlpha=clamp(1-(T-h.te)/.35)*.4; rectA(h,g.s-14,g.e+14,g.c,3); ctx.globalAlpha=1;}
+      glow(col,24); ctx.fillStyle=col; ctx.globalAlpha=.85*(.5+.5*fade); band(h,g,a0,a1,th*fade+2);
+      ctx.shadowBlur=0; ctx.fillStyle='#fff'; ctx.globalAlpha=.9; band(h,g,a0,a1,Math.max(2,th*.22*fade));
+      if(h.stop){const [x,y]=pt(h,g,a1); ctx.fillStyle=col; ctx.globalAlpha=.8; ctx.beginPath(); ctx.arc(x,y,CS*.14+Math.random()*3,0,7); ctx.fill();}
+      ctx.globalAlpha=1;
+    } else {ctx.fillStyle=col; ctx.globalAlpha=clamp(1-(T-h.te)/.35)*.4; band(h,g,a0,a1,3); ctx.globalAlpha=1;}
   }
-}
-function drawDrones(T){
+  // 照準ドローン
   for(const h of G.hz){ if(h.type!=='drone')continue; const col=TMAP.drone.color;
     const lock=T>=h.tl, f=lock?clamp((T-h.tl)/(h.tf-h.tl)):0;
     if(active(h,T)){const [x,y]=h.cells[0]; glow(col,20); ctx.fillStyle=col; ctx.globalAlpha=.85; rr(cx(x),cy(y),CS,CS,4); ctx.fill(); ctx.shadowBlur=0; ctx.globalAlpha=1; continue;}
     if(T>=h.te)continue;
-    const r=lock?lerp(CS*.62,CS*.26,f):CS*.55, rot=T*(lock?0:2.2);
-    ctx.save(); ctx.translate(h.rx,h.ry); ctx.rotate(rot); ctx.strokeStyle=lock?'#ffb02e':col; ctx.lineWidth=lock?3:2; glow(col,lock?14:6);
+    const r=lock?lerp(CS*.62,CS*.26,f):CS*.55;
+    ctx.save(); ctx.translate(h.rx,h.ry); ctx.rotate(lock?0:T*2.2); ctx.strokeStyle=lock?'#ffb02e':col; ctx.lineWidth=lock?3:2; glow(col,lock?14:6);
     ctx.setLineDash(lock?[]:[6,5]); ctx.beginPath(); ctx.arc(0,0,r,0,7); ctx.stroke(); ctx.setLineDash([]);
     for(let i=0;i<4;i++){ctx.rotate(Math.PI/2); ctx.beginPath(); ctx.moveTo(r-6,0); ctx.lineTo(r+8,0); ctx.stroke();}
     ctx.restore(); ctx.shadowBlur=0;
@@ -424,84 +490,72 @@ function drawDrones(T){
 function drawPlayer(T){
   let X=cx(G.vx)+CS/2, Y=cy(G.vy)+CS/2;
   if(G.bump){const t=(T-G.bump.t)/.12; if(t<1){const o=Math.sin(t*Math.PI)*CS*.08; X+=G.bump.dx*o; Y+=G.bump.dy*o;} else G.bump=null;}
-  const r=CS*.24; const col=G.alive?'#e9fbff':'#ff4d6d';
-  glow('#4fd8ff',G.alive?18:0); ctx.fillStyle='#0b2533'; ctx.beginPath(); ctx.arc(X,Y,r,0,7); ctx.fill();
+  if(G.state==='play'&&T<G.inv&&Math.floor(T*16)%2)return;
+  const r=CS*.26, dead=G.state==='dead', col=dead?'#ff4d6d':'#e9fbff';
+  glow('#4fd8ff',dead?0:18); ctx.fillStyle='#0b2533'; ctx.beginPath(); ctx.arc(X,Y,r,0,7); ctx.fill();
   ctx.lineWidth=3; ctx.strokeStyle=col; ctx.stroke(); ctx.shadowBlur=0;
+  if(G.shields>0){ctx.strokeStyle='rgba(79,216,255,.6)'; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(X,Y,r+5,0,7); ctx.stroke();}
   ctx.fillStyle=col; ctx.fillRect(X-r*.55,Y-r*.18,r*1.1,r*.36);
   ctx.fillStyle='#4fd8ff'; ctx.fillRect(X-r*.2+Math.sin(T*3)*r*.25,Y-r*.12,r*.4,r*.24);
 }
 function draw(){
   const T=G?G.T:0;
-  ctx.setTransform(DPR,0,0,DPR,0,0); ctx.clearRect(0,0,W,H);
-  ctx.fillStyle='#06090f'; ctx.fillRect(0,0,W,H);
-  // 背景の目盛り
+  ctx.setTransform(DPR,0,0,DPR,0,0); ctx.fillStyle='#06090f'; ctx.fillRect(0,0,W,H);
   ctx.strokeStyle='rgba(79,216,255,.05)'; ctx.lineWidth=1; const st=24;
   for(let x=(W/2)%st;x<W;x+=st){ctx.beginPath();ctx.moveTo(x+.5,0);ctx.lineTo(x+.5,H);ctx.stroke();}
   for(let y=(H/2)%st;y<H;y+=st){ctx.beginPath();ctx.moveTo(0,y+.5);ctx.lineTo(W,y+.5);ctx.stroke();}
-  if(G&&G.shake>0){ctx.translate((Math.random()-.5)*12*G.shake,(Math.random()-.5)*12*G.shake);}
-  drawFloor(T);
-  if(G){drawHazards(T); drawDrones(T); drawPlayer(T);
+  if(!G){M=new Array(16).fill(1); N=4; layout();}
+  if(G&&G.shake>0)ctx.translate((Math.random()-.5)*12*G.shake,(Math.random()-.5)*12*G.shake);
+  drawRoom(T);
+  if(G){ if(G.state!=='clear')drawHazards(T); drawPlayer(T);
     if(G.flash>0){ctx.setTransform(DPR,0,0,DPR,0,0); ctx.fillStyle='rgba(255,77,109,'+(G.flash*.35)+')'; ctx.fillRect(0,0,W,H);}}
 }
 function hud(){
   if(!G)return;
-  $('#time').innerHTML=G.T.toFixed(1)+'<small>秒</small>';
-  if(cfg.mode==='phase'){const p=Math.min(NT,Math.max(0,G.phase)); $('#phase').textContent='試験 '+(p+1)+' / '+(NT+1); $('#phaseName').textContent=p<NT?TYPES[p].name:'総合試験';}
-  else {$('#phase').textContent='試験'; $('#phaseName').textContent=N+'×'+N+' 区画';}
+  $('#room').textContent='区画 '+G.room; $('#shape').textContent=G.shapeName+' '+N+'×'+N;
+  const t=$('#time');
+  if(G.state==='clear'){$('#midLabel').textContent='突破'; t.textContent='CLEAR'; t.className='open';}
+  else if(G.exit){$('#midLabel').textContent='出口が開いた'; t.textContent='出口へ'; t.className='open';}
+  else {$('#midLabel').textContent='出口が開くまで'; t.textContent=Math.max(0,G.exitAt-G.T).toFixed(1); t.className='';}
+  $('#shields').textContent=[G.shields?'盾 '+G.shields:'',G.dodges?'回避 '+G.dodges:''].filter(Boolean).join('　');
 }
 
 let last=performance.now();
 function frame(now){
   const dt=Math.min(.05,(now-last)/1000); last=now;
   update(dt); tickBanner(dt);
-  if(G){G.shake=Math.max(0,G.shake-dt*2.5); G.flash=Math.max(0,G.flash-dt*2); G.expand=Math.max(0,G.expand-dt*1.4);}
+  if(G){G.shake=Math.max(0,G.shake-dt*2.5); G.flash=Math.max(0,G.flash-dt*2); G.enter=Math.max(0,G.enter-dt*1.4);}
   draw(); hud(); requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
 
 // ---- 操作 ----
-$('#go').addEventListener('click',startGame);
+$('#go').addEventListener('click',startRun);
 const KEYS={ArrowUp:[0,-1],ArrowDown:[0,1],ArrowLeft:[-1,0],ArrowRight:[1,0],w:[0,-1],s:[0,1],a:[-1,0],d:[1,0]};
 let lastKey=0;
 window.addEventListener('keydown',e=>{
-  if(!$('#ov').hidden){ if(e.key==='Enter'&&document.activeElement.tagName!=='BUTTON'){e.preventDefault(); startGame();} return;}
+  if(!$('#ovPick').hidden){const i=+e.key-1; const b=document.querySelectorAll('.mod')[i]; if(b){e.preventDefault(); takeMod(b.dataset.m);} return;}
+  if(!$('#ovStart').hidden){ if(e.key==='Enter'&&document.activeElement.tagName!=='BUTTON'){e.preventDefault(); startRun();} return;}
   const k=KEYS[e.key.length===1?e.key.toLowerCase():e.key]; if(!k)return; e.preventDefault();
-  const now=performance.now(); if(e.repeat&&now-lastKey<95)return; lastKey=now; G.path=[]; tryMove(k[0],k[1]);
+  const now=performance.now(); if(e.repeat&&now-lastKey<95)return; lastKey=now; tryMove(k[0],k[1]);
 });
 // 指ごとに覚える。両手で触っても、どの指も1回のタッチで1マスだけ動く
-const touches=new Map(), app=document.querySelector('#app');
+const touches=new Map(), app=$('#app');
 app.addEventListener('pointerdown',e=>{
-  if(!G||!G.alive||e.target.closest('button'))return;
-  e.preventDefault();
-  touches.set(e.pointerId,{x:e.clientX,y:e.clientY,used:false});
+  if(!G||G.state!=='play'||e.target.closest('button'))return;
+  e.preventDefault(); touches.set(e.pointerId,{x:e.clientX,y:e.clientY,used:false});
   try{app.setPointerCapture(e.pointerId);}catch(_){}
 });
 app.addEventListener('pointermove',e=>{
-  const t=touches.get(e.pointerId);
-  if(cfg.ctrl!=='drag'||!t||t.used)return;
-  const th=Math.max(14,Math.min(28,CS*.2)), dx=e.clientX-t.x, dy=e.clientY-t.y;
+  const t=touches.get(e.pointerId); if(!t||t.used)return;
+  const th=Math.max(14,Math.min(28,CS*.25)), dx=e.clientX-t.x, dy=e.clientY-t.y;
   if(Math.abs(dx)<th&&Math.abs(dy)<th)return;
-  t.used=true;
-  if(Math.abs(dx)>Math.abs(dy))tryMove(Math.sign(dx),0); else tryMove(0,Math.sign(dy));
+  t.used=true; if(Math.abs(dx)>Math.abs(dy))tryMove(Math.sign(dx),0); else tryMove(0,Math.sign(dy));
 });
-function release(e){
-  const t=touches.get(e.pointerId); if(!t)return;
-  touches.delete(e.pointerId);
-  if(cfg.ctrl==='tap'&&!t.used&&G&&G.alive&&e.type==='pointerup'){
-    const r=stage.getBoundingClientRect(), x=e.clientX-r.left, y=e.clientY-r.top;
-    const tx=Math.floor((x-BX+GAP/2)/(CS+GAP)), ty=Math.floor((y-BY+GAP/2)/(CS+GAP));
-    if(inside(tx,ty)) planPath(tx,ty);
-  }
-}
+function release(e){touches.delete(e.pointerId);}
 app.addEventListener('pointerup',release); app.addEventListener('pointercancel',release);
-function planPath(tx,ty){
-  // 横が先か縦が先か、今ふさがっていない方を選ぶ
-  const mk=hf=>{const p=[];let x=G.px,y=G.py; const sx=Math.sign(tx-x),sy=Math.sign(ty-y);
-    if(hf){while(x!==tx){x+=sx;p.push([x,y]);} while(y!==ty){y+=sy;p.push([x,y]);}} else {while(y!==ty){y+=sy;p.push([x,y]);} while(x!==tx){x+=sx;p.push([x,y]);}} return p;};
-  const score=p=>p.reduce((s,[x,y],i)=>s+(blockedAt(x,y,G.T)?10:0)+(dangerSet(G.hz,G.T+.07*(i+1)).has(x+','+y)?5:0),0);
-  const a=mk(true),b=mk(false); G.path=score(a)<=score(b)?a:b; G.stepT=Math.min(G.stepT,G.T);
-}
-renderCfg();
+// 試しの撮影用（画面には出ない）
+window.__lab={get G(){return G;},enterRoom:k=>{G.state='play';$('#ovPick').hidden=true;enterRoom(k);},takeMod,startRun};
 })();
 </script>
 </body>
