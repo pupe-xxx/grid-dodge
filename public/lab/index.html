@@ -70,7 +70,7 @@ details ul{margin:6px 0 0;padding-left:1.2em;line-height:1.7}
     <div class="r"><div id="modeTag"></div><button class="icon" id="mute" aria-label="音の入り切り">音 入</button></div>
   </div>
   <div id="stage"><canvas id="cv"></canvas><div id="banner"><div class="off"><b></b><span></span></div></div></div>
-  <div id="foot">（試作 v8）</div>
+  <div id="foot">（試作 v9）</div>
 </div>
 
 <div class="ov" id="ovStart">
@@ -178,7 +178,7 @@ function startRun(mode){
   if(mode)MODE=mode;
   if(!AC){try{AC=new (window.AudioContext||window.webkitAudioContext)();}catch(e){}} else if(AC.state==='suspended')AC.resume();
   G={room:0,totalT:0,state:'play',T:0,hz:[],gid:0,shake:0,flash:0,cause:null,erased:[]};
-  $('#ovStart').hidden=true; $('#result').hidden=false; $('#foot').textContent=MODES[MODE].foot+'　（試作 v8）';
+  $('#ovStart').hidden=true; $('#result').hidden=false; $('#foot').textContent=MODES[MODE].foot+'　（試作 v9）';
   $('#modeTag').textContent=MODES[MODE].name; enterRoom(1);
 }
 function nearest(fl,tx,ty,not){let best=null,bd=1e9;for(const f of fl){if(not&&f[0]===not[0]&&f[1]===not[1])continue;
@@ -208,28 +208,24 @@ function canEnter(x,y,t){return walk(x,y)&&!blockedAt(x,y,t);}
 
 // 塗る割合：区画 1 は 85%、区画ごとに 3% 増え、区画 6 から全部
 function paintRatio(k){return Math.min(1,.85+(k-1)*.03);}
-// 移動は MOVE 秒かけて隣のマスへ。半分進んだ所で当たり判定が次のマスへ移る（見た目と判定をそろえる）
+// 判定はフリックした瞬間に次のマスへ移る。見た目だけ MOVE 秒かけて滑らせ、着いてからマスの色を変える
 const MOVE=.11, PAINT_T=.2;
-const posOf=b=>b.moving?[b.tx,b.ty]:[b.x,b.y];
+const posOf=b=>[b.x,b.y];
 function tryMove(bi,dx,dy){
   if(!G||G.state!=='play')return false;
   const b=G.bots[bi]; if(!b)return false;
-  if(b.moving){b.q=[dx,dy]; return false;} // 動いている間のフリックは 1 つだけ覚えておき、着いたら動く
-  const nx=b.x+dx,ny=b.y+dy, other=G.bots.some((o,i)=>i!==bi&&((o.x===nx&&o.y===ny)||(o.tx===nx&&o.ty===ny)));
+  const nx=b.x+dx,ny=b.y+dy, other=G.bots.some((o,i)=>i!==bi&&o.x===nx&&o.y===ny);
   if(!canEnter(nx,ny,G.T)||other){b.bump={dx,dy,t:G.T}; beep(140,.06,'square',.025); return false;}
-  Object.assign(b,{fx:b.x,fy:b.y,tx:nx,ty:ny,mt:G.T,moving:true}); beep(bi?600:520+ri(60),.04,'triangle',.03);
+  Object.assign(b,{fx:b.vx,fy:b.vy,x:nx,y:ny,mt:G.T,moving:true}); beep(bi?600:520+ri(60),.04,'triangle',.03);
+  if(MODE==='paint'){const k=nx+','+ny; if(!G.paint.has(k)){G.paint.set(k,G.T+MOVE); G.lastPaint=G.T+MOVE; setTimeout(()=>beep(760+G.paint.size*8,.05,'sine',.025),MOVE*1000);}}
   return true;
 }
 function stepBots(T){
-  G.bots.forEach((b,bi)=>{
-    if(!b.moving){b.vx=b.x; b.vy=b.y; return;}
+  for(const b of G.bots){
+    if(!b.moving){b.vx=b.x; b.vy=b.y; continue;}
     const p=clamp((T-b.mt)/MOVE), e=1-(1-p)*(1-p);
-    b.vx=lerp(b.fx,b.tx,e); b.vy=lerp(b.fy,b.ty,e);
-    if(p>=.5){b.x=b.tx; b.y=b.ty;}
-    if(p>=1){b.moving=false;
-      if(MODE==='paint'){const k=b.x+','+b.y; if(!G.paint.has(k)){G.paint.set(k,T); G.lastPaint=T; beep(760+G.paint.size*8,.05,'sine',.025);}}
-      if(b.q){const [dx,dy]=b.q; b.q=null; tryMove(bi,dx,dy);}}
-  });
+    b.vx=lerp(b.fx,b.x,e); b.vy=lerp(b.fy,b.y,e); if(p>=1)b.moving=false;
+  }
 }
 
 // ---- 障害 ----
@@ -329,6 +325,8 @@ function update(dt){
   if(!G)return;
   if(G.state==='dead')return;
   if(G.state==='clear'){G.clearT+=dt; if(G.clearT>1.0)enterRoom(G.room+1); return;}
+  // 突破は決まった。ロボットが着いて色が変わるのを見せてから、突破の表示へ（この間は当たらない）
+  if(G.state==='finish'){G.T+=dt; stepBots(G.T); if(G.T>=G.finishAt)clearRoom(); return;}
   G.T+=dt; G.totalT+=dt; const T=G.T;
   if(MODE==='duo'&&!G.exits&&T>=G.exitAt)openExits();
   for(const h of G.hz)if(h.type==='drone'){const b=G.bots[h.bot]; if(T<h.tl)h.cells=[[b.x,b.y]];
@@ -339,9 +337,8 @@ function update(dt){
   G.erased=G.erased.filter(e=>T-e.t<.6);
   stepBots(T);
   if(!G.god)for(let i=0;i<G.bots.length;i++){const b=G.bots[i]; for(const h of G.hz)if(active(h,T)&&has(cellsAt(h,T),b.x,b.y)){die(h,i);return;}}
-  // 突破は、着いて（塗り終えて）から
-  if(MODE==='duo'&&G.exits&&G.bots.every((b,i)=>!b.moving&&b.x===G.exits[i][0]&&b.y===G.exits[i][1])){clearRoom();return;}
-  if(MODE==='paint'&&G.paint.size>=G.goal&&T-G.lastPaint>=PAINT_T+.12){clearRoom();return;}
+  if(MODE==='duo'&&G.exits&&G.bots.every((b,i)=>b.x===G.exits[i][0]&&b.y===G.exits[i][1])){G.state='finish'; G.finishAt=T+MOVE+.2; return;}
+  if(MODE==='paint'&&G.paint.size>=G.goal){G.state='finish'; G.finishAt=Math.max(T,G.lastPaint)+PAINT_T+.2; return;}
   G.hz=G.hz.filter(h=>h.te>T-.35);
   spawn();
 }
@@ -388,7 +385,7 @@ function drawRoom(T){
   for(let y=0;y<N;y++)for(let x=0;x<N;x++){
     const v=at(x,y); if(!v)continue;
     const X=cx(x),Y=cy(y); ctx.globalAlpha=e>0?clamp(1-e*1.4+((x+y)/(2*N))*.8):1;
-    if(v===1){const pt0=G&&MODE==='paint'&&G.paint?G.paint.get(x+','+y):undefined, painted=pt0!==undefined, pa=painted?clamp((T-pt0)/PAINT_T):0;
+    if(v===1){const pt0=G&&MODE==='paint'&&G.paint?G.paint.get(x+','+y):undefined, painted=pt0!==undefined&&T>=pt0, pa=painted?clamp((T-pt0)/PAINT_T):0;
       ctx.fillStyle=painted&&pa>.5?'#0f3a4c':'#0c1520'; rr(X,Y,CS,CS,4); ctx.fill(); ctx.strokeStyle=painted?'rgba(79,216,255,.75)':'rgba(79,216,255,.22)'; ctx.lineWidth=painted?2:1; ctx.stroke();
       if(painted){const o=CS*(.5-.32*pa); ctx.fillStyle='rgba(79,216,255,'+(.18+.5*(1-pa))+')'; rr(X+o,Y+o,CS-2*o,CS-2*o,3); ctx.fill();}
       ctx.fillStyle='rgba(79,216,255,.35)'; const k=Math.max(3,CS*.08);
