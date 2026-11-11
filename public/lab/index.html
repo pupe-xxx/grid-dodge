@@ -56,6 +56,19 @@ h1 span{color:var(--accent)}
 .modeBtn span{font-size:12px;color:var(--dim);line-height:1.6}
 .modeBtn small{font-family:var(--f-num);font-size:11px;color:var(--accent)}
 .modeBtn:active{border-color:var(--accent)}
+.sec{display:flex;flex-direction:column;gap:10px}
+.sec h2{margin:0;font-size:16px}
+.sec h2 small{font-size:12px;color:var(--dim);font-weight:400;margin-left:6px}
+#stages{display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:8px}
+.stg{background:#0f1a26;color:var(--ink);border:1px solid var(--edge);border-radius:8px;padding:8px 6px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;font-family:var(--f-jp);min-height:64px}
+.stg b{font-family:var(--f-num);font-size:18px;line-height:1.1}
+.stg span{font-size:11px;color:var(--dim);text-align:center;line-height:1.3}
+.stg.done{border-color:var(--exit)}
+.stg.done b::after{content:" \2713";color:var(--exit);font-size:13px}
+.stg:active{border-color:var(--accent)}
+.toggle{display:flex;gap:10px;align-items:flex-start;font-size:13px;line-height:1.6;cursor:pointer}
+.toggle input{margin-top:4px;width:18px;height:18px;accent-color:var(--accent);flex:none}
+.toggle span small{display:block;font-size:12px;color:var(--dim)}
 details{font-size:12px;color:var(--dim)}
 details summary{cursor:pointer}
 details ul{margin:6px 0 0;padding-left:1.2em;line-height:1.7}
@@ -70,7 +83,7 @@ details ul{margin:6px 0 0;padding-left:1.2em;line-height:1.7}
     <div class="r"><div id="modeTag"></div><button class="icon" id="mute" aria-label="音の入り切り">音 入</button></div>
   </div>
   <div id="stage"><canvas id="cv"></canvas><div id="banner"><div class="off"><b></b><span></span></div></div></div>
-  <div id="foot">（試作 v10）</div>
+  <div id="foot">（試作 v11）</div>
 </div>
 
 <div class="ov" id="ovStart">
@@ -84,8 +97,13 @@ details ul{margin:6px 0 0;padding-left:1.2em;line-height:1.7}
       <h1>GRID DODGE <span>LAB</span></h1>
       <p class="lead">被験体のロボットで、試験区画を1つずつ抜けていく。区画の形は毎回ちがう。当たったら最初から。</p>
     </div>
+    <div class="sec">
+      <h2>逃げながら塗る<small>ステージを選ぶ</small></h2>
+      <p class="lead" style="margin:0">通ったマスが塗られる。目標のマス数を塗ればステージ突破で、次のステージへ続く。</p>
+      <label class="toggle"><input type="checkbox" id="flipOpt" checked><span><b>新ルール：撃たれたマスの色が反転する</b><small>塗ったマスは消え、塗っていないマスは塗られる。障害は自分の列やマスを狙うので、塗っていない所へ誘い込んでかわすと、塗る手伝いになる。外すと「撃たれたら消えるだけ」</small></span></label>
+      <div id="stages"></div>
+    </div>
     <button class="modeBtn" data-mode="duo"><small>案 1</small><b>二体同時の試験</b><span>ロボットが2体。画面の左半分のフリックで L、右半分で R が動く（キーは WASD と矢印）。しばらく生き延びると出口が2つ開き、L と R がそれぞれの出口に同時に乗れば突破。</span></button>
-    <button class="modeBtn" data-mode="paint"><small>案 3</small><b>逃げながら塗る</b><span>通ったマスが自分の色に塗られる。床の 70% を塗れば突破。撃たれた床は色が消えるので、止まっていても進まない。</span></button>
     <details><summary>障害と柱の見分け方</summary><ul id="legend"></ul></details>
     <p class="lead" id="bestNote"></p>
   </div>
@@ -118,6 +136,15 @@ function setBest(m,v){try{localStorage.setItem(bestKey(m),String(v));}catch(e){}
 function showBest(){const a=getBest('duo'),b=getBest('paint');
   $('#bestNote').textContent=(a||b)?'これまでの最高：二体同時 区画 '+a+'　／　塗る 区画 '+b+'（突破した数）':'';}
 showBest();
+const STAGES=7;
+function getCleared(){try{return new Set(JSON.parse(localStorage.getItem('gdlab-paint-cleared')||'[]'));}catch(e){return new Set();}}
+function addCleared(k){const c=getCleared(); c.add(k); try{localStorage.setItem('gdlab-paint-cleared',JSON.stringify([...c]));}catch(e){}}
+function renderStages(){const c=getCleared(); let h='';
+  for(let k=1;k<=STAGES;k++){const n=Math.min(8,3+k), t=k===1?'レーザー・球':k>=TYPES.length?'全部の試験':TYPES[k].name;
+    h+='<button class="stg'+(c.has(k)?' done':'')+'" data-stage="'+k+'"><b>'+k+'</b><span>'+n+'×'+n+'<br>'+t+'</span></button>';}
+  $('#stages').innerHTML=h;}
+renderStages();
+let FLIP=true;
 
 // ---- 音 ----
 let AC=null,muted=false;
@@ -174,12 +201,12 @@ function genRoom(k){
 
 // ---- 状態 ----
 let G=null;
-function startRun(mode){
-  if(mode)MODE=mode;
+function startRun(mode,stage){
+  if(mode)MODE=mode; stage=stage||1; FLIP=$('#flipOpt').checked;
   if(!AC){try{AC=new (window.AudioContext||window.webkitAudioContext)();}catch(e){}} else if(AC.state==='suspended')AC.resume();
-  G={room:0,totalT:0,state:'play',T:0,hz:[],gid:0,shake:0,flash:0,cause:null,erased:[]};
-  $('#ovStart').hidden=true; $('#result').hidden=false; $('#foot').textContent=MODES[MODE].foot+'　（試作 v10）';
-  $('#modeTag').textContent=MODES[MODE].name; enterRoom(1);
+  G={room:0,totalT:0,state:'play',T:0,hz:[],gid:0,shake:0,flash:0,cause:null,erased:[],gained:[]};
+  $('#ovStart').hidden=true; $('#result').hidden=false; $('#foot').textContent=MODES[MODE].foot+'　（試作 v11）';
+  $('#modeTag').textContent=MODES[MODE].name+(MODE==='paint'&&FLIP?'・反転':''); G.startStage=stage; enterRoom(stage);
 }
 function nearest(fl,tx,ty,not){let best=null,bd=1e9;for(const f of fl){if(not&&f[0]===not[0]&&f[1]===not[1])continue;
   const d=Math.abs(f[0]-tx)+Math.abs(f[1]-ty)+Math.random()*.1; if(d<bd){bd=d;best=f;}}return best;}
@@ -189,11 +216,11 @@ function enterRoom(k){
   if(MODE==='duo'){const a=nearest(fl,c-1.5,c), b=nearest(fl,c+1.5,c,a); bots.push(mk(a),mk(b));}
   else bots.push(mk(nearest(fl,c,c)));
   function mk(p){return {x:p[0],y:p[1],tx:p[0],ty:p[1],fx:p[0],fy:p[1],mt:0,moving:false,q:null,vx:p[0],vy:p[1],bump:null};}
-  Object.assign(G,{room:k,state:'play',T:0,hz:[],bots,exits:null,exitAt:Math.min(20,11+k*1.5),nextSpawn:.9,enter:1,erased:[]});
+  Object.assign(G,{room:k,state:'play',T:0,hz:[],bots,exits:null,exitAt:Math.min(20,11+k*1.5),nextSpawn:.9,enter:1,erased:[],gained:[]});
   if(MODE==='paint'){const ratio=paintRatio(k); G.paint=new Map([[bots[0].x+','+bots[0].y,-1]]); G.lastPaint=-1; G.ratio=ratio; G.goal=Math.ceil(fl.length*ratio);}
   bannerQ.length=0; bannerT=0;
   if(MODE==='duo')banner('区画 '+k+'：'+N+'×'+N,'左手で L、右手で R。出口が開いたら、それぞれの出口へ');
-  else banner('区画 '+k+'：'+N+'×'+N,(G.goal>=fl.length?'床を全部（':'床の '+Math.round(G.ratio*100)+'%（')+G.goal+' マス）塗れば突破。撃たれた床は消える');
+  else banner('ステージ '+k+'：'+N+'×'+N,(G.goal>=fl.length?'床を全部（':'床の '+Math.round(G.ratio*100)+'%（')+G.goal+' マス）塗れば突破。'+(FLIP?'撃たれたマスは色が反転する':'撃たれた床は消える'));
   const t=TYPES[Math.min(TYPES.length-1,k)];
   if(k>1&&k<TYPES.length)banner('新しい試験：'+t.name,t.desc);
   beep(330,.3,'sine',.05,880);
@@ -215,7 +242,7 @@ function tryMove(bi,dx,dy){
   if(!G||G.state!=='play')return false;
   const b=G.bots[bi]; if(!b)return false;
   const nx=b.x+dx,ny=b.y+dy, other=G.bots.some((o,i)=>i!==bi&&o.x===nx&&o.y===ny);
-  if(!canEnter(nx,ny,G.T)||other){b.bump={dx,dy,t:G.T}; beep(140,.06,'square',.025); return false;}
+  if(!walk(nx,ny)||other){b.bump={dx,dy,t:G.T}; beep(140,.06,'square',.025); return false;}
   Object.assign(b,{fx:b.vx,fy:b.vy,x:nx,y:ny,mt:G.T,moving:true}); beep(bi?600:520+ri(60),.04,'triangle',.03);
   if(MODE==='paint'){const k=nx+','+ny; if(!G.paint.has(k)){G.paint.set(k,G.T+MOVE); G.lastPaint=G.T+MOVE; setTimeout(()=>beep(760+G.paint.size*8,.05,'sine',.025),MOVE*1000);}}
   return true;
@@ -293,11 +320,11 @@ function fair(cands){
 }
 // 出す障害を選ぶ。新しい試験を多めに出す。塗る方では球を少なくし、同時に出る数も絞る（球は通った列の色を順に消し、重いので）
 function pickType(al,T){
-  const paint=MODE==='paint', orbCap=N>=7?2:1, orbs=G.hz.filter(h=>h.type==='orb'&&h.te>T).length;
+  const paint=MODE==='paint', orbCap=N>=5?2:1, orbs=G.hz.filter(h=>h.type==='orb'&&h.te>T).length;
   const ok=al.filter(id=>!(paint&&id==='orb'&&orbs>=orbCap));
   const newest=al[al.length-1];
   if(G.room<TYPES.length&&ok.includes(newest)&&Math.random()<(paint?.3:.4))return newest;
-  const wt=id=>paint&&id==='orb'?.5:1, sum=ok.reduce((a,id)=>a+wt(id),0); let r=Math.random()*sum;
+  const wt=id=>paint&&id==='orb'?.75:1, sum=ok.reduce((a,id)=>a+wt(id),0); let r=Math.random()*sum;
   for(const id of ok){r-=wt(id); if(r<=0)return id;} return ok[ok.length-1];
 }
 function spawn(){
@@ -346,7 +373,11 @@ function update(dt){
     const [x,y]=h.cells[0]; const k=1-Math.exp(-dt*(T<h.tl?7:30)); h.rx+=(cx(x)+CS/2-h.rx)*k; h.ry+=(cy(y)+CS/2-h.ry)*k;}
   for(const h of G.hz)if(!h.fired&&T>=h.tf){h.fired=true; if(h.type==='beam'||h.type==='panel')beep(110,.35,'sawtooth',.03,90); else if(h.type!=='orb')beep(1200,.12,'sawtooth',.025,300); else beep(200,.3,'triangle',.04,120);}
   // 撃たれた床は色が消える
-  if(MODE==='paint')for(const h of G.hz)if(active(h,T))for(const c of cellsAt(h,T)){const k=c[0]+','+c[1]; if(G.paint.has(k)){G.paint.delete(k); G.erased.push({x:c[0],y:c[1],t:T});}}
+  // 撃たれたマス：塗ってあれば消える。反転のルールでは、塗っていなければ塗られる（障害 1 つにつき 1 マス 1 回）
+  if(MODE==='paint'){let gain=0; for(const h of G.hz)if(active(h,T)){h.flip=h.flip||new Set(); for(const c of cellsAt(h,T)){const k=c[0]+','+c[1]; if(h.flip.has(k))continue; h.flip.add(k);
+    if(G.paint.has(k)){G.paint.delete(k); G.erased.push({x:c[0],y:c[1],t:T});} else if(FLIP){G.paint.set(k,T); G.lastPaint=T; G.gained.push({x:c[0],y:c[1],t:T}); gain++;}}}
+    if(gain)beep(900+gain*40,.08,'sine',.03,1400);}
+  G.gained=G.gained.filter(e=>T-e.t<.6);
   G.erased=G.erased.filter(e=>T-e.t<.6);
   stepBots(T);
   if(!G.god)for(let i=0;i<G.bots.length;i++){const b=G.bots[i]; for(const h of G.hz)if(active(h,T)&&has(cellsAt(h,T),b.x,b.y)){die(h,i);return;}}
@@ -358,19 +389,25 @@ function update(dt){
 function clearRoom(){
   G.state='clear'; G.clearT=0; G.hz=[]; beep(523,.12,'sine',.05); setTimeout(()=>beep(784,.2,'sine',.05),120);
   if(G.room>getBest(MODE))setBest(MODE,G.room);
-  banner('区画 '+G.room+' を突破','次の区画へ');
+  if(MODE==='paint'){addCleared(G.room); renderStages();}
+  banner((MODE==='paint'?'ステージ ':'区画 ')+G.room+' を突破',MODE==='paint'&&G.room>=STAGES?'最後のステージ。続けて遊べる':'次へ');
 }
 function die(h,bi){
   G.state='dead'; G.cause=h; G.deadBot=bi; G.shake=1; G.flash=1; beep(220,.6,'sawtooth',.06,40);
   setTimeout(showResult,900);
 }
 function showResult(){
-  const cleared=G.room-1, best=getBest(MODE);
-  $('#rHead').textContent='ラン終了：'+MODES[MODE].name;
-  $('#rMain').textContent='区画 '+G.room+' で停止';
-  $('#rSub').innerHTML='突破 '+cleared+' 区画　／　'+G.totalT.toFixed(1)+' 秒<br>当たった障害：<b style="color:'+TMAP[G.cause.type].color+'">'+TMAP[G.cause.type].name+'</b>'+
-    (MODE==='duo'?'（'+BOTN[G.deadBot]+' が当たった）':'')+'<br>'+(cleared>0&&cleared>=best?'最高記録':'最高：区画 '+best+' まで突破');
-  $('#ovStart').hidden=false; showBest(); document.querySelector('.modeBtn[data-mode="'+MODE+'"]').focus({preventScroll:true});
+  const cleared=G.room-(G.startStage||1), best=getBest(MODE), cause='当たった障害：<b style="color:'+TMAP[G.cause.type].color+'">'+TMAP[G.cause.type].name+'</b>';
+  $('#rHead').textContent='終了：'+MODES[MODE].name+(MODE==='paint'&&FLIP?'（反転）':'');
+  if(MODE==='paint'){
+    $('#rMain').textContent='ステージ '+G.room+' で失敗';
+    $('#rSub').innerHTML='塗った '+G.paint.size+' ／ '+G.goal+' マス　／　'+G.totalT.toFixed(1)+' 秒<br>'+cause+'<br>ステージ '+G.startStage+' から '+cleared+' つ突破';
+  } else {
+    $('#rMain').textContent='区画 '+G.room+' で停止';
+    $('#rSub').innerHTML='突破 '+cleared+' 区画　／　'+G.totalT.toFixed(1)+' 秒<br>'+cause+'（'+BOTN[G.deadBot]+' が当たった）<br>'+(cleared>0&&cleared>=best?'最高記録':'最高：区画 '+best+' まで突破');
+  }
+  $('#ovStart').hidden=false; showBest();
+  const f=MODE==='paint'?document.querySelector('.stg[data-stage="'+G.room+'"]'):document.querySelector('.modeBtn[data-mode="duo"]'); if(f)f.focus({preventScroll:true});
 }
 
 // ---- 描く ----
@@ -411,6 +448,8 @@ function drawRoom(T){
     ctx.globalAlpha=1;
   }
   if(G)for(const er of G.erased){const q=(T-er.t)/.6, X=cx(er.x),Y=cy(er.y); ctx.strokeStyle='#ff4d6d'; ctx.globalAlpha=1-q; ctx.lineWidth=2;
+    const o=q*CS*.15; rr(X-o,Y-o,CS+2*o,CS+2*o,5); ctx.stroke(); ctx.globalAlpha=1;}
+  if(G)for(const g of G.gained){const q=(T-g.t)/.6, X=cx(g.x),Y=cy(g.y); ctx.strokeStyle='#eafcff'; ctx.globalAlpha=(1-q)*.9; ctx.lineWidth=2;
     const o=q*CS*.15; rr(X-o,Y-o,CS+2*o,CS+2*o,5); ctx.stroke(); ctx.globalAlpha=1;}
   if(G&&G.exits)G.exits.forEach(([x,y],i)=>{const col=BOTC[i],X=cx(x),Y=cy(y),p=(T*1.6)%1;
     glow(col,18); ctx.fillStyle=col; ctx.globalAlpha=.2+.12*Math.sin(T*6); rr(X,Y,CS,CS,4); ctx.fill(); ctx.shadowBlur=0; ctx.globalAlpha=1;
@@ -510,7 +549,7 @@ function draw(){
 }
 function hud(){
   if(!G)return;
-  $('#room').textContent='区画 '+G.room; $('#shape').textContent=N+'×'+N+'　床 '+floors().length;
+  $('#room').textContent=(MODE==='paint'?'ステージ ':'区画 ')+G.room; $('#shape').textContent=N+'×'+N+'　床 '+floors().length;
   const t=$('#time'), L=$('#midLabel');
   if(G.state==='clear'){L.textContent='突破'; t.textContent='CLEAR'; t.className='open';}
   else if(MODE==='paint'){L.textContent='塗った床 ／ 目標'; t.textContent=G.paint.size+'/'+G.goal; t.className=G.paint.size>=G.goal-2?'open':'';}
@@ -529,6 +568,7 @@ requestAnimationFrame(frame);
 
 // ---- 操作 ----
 document.querySelectorAll('.modeBtn').forEach(b=>b.addEventListener('click',()=>startRun(b.dataset.mode)));
+$('#stages').addEventListener('click',e=>{const b=e.target.closest('.stg'); if(b)startRun('paint',+b.dataset.stage);});
 const K1={w:[0,-1],s:[0,1],a:[-1,0],d:[1,0]}, K2={ArrowUp:[0,-1],ArrowDown:[0,1],ArrowLeft:[-1,0],ArrowRight:[1,0]};
 let lastKey=0;
 window.addEventListener('keydown',e=>{
