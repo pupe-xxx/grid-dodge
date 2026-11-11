@@ -83,7 +83,7 @@ details ul{margin:6px 0 0;padding-left:1.2em;line-height:1.7}
     <div class="r"><div id="modeTag"></div><button class="icon" id="mute" aria-label="音の入り切り">音 入</button></div>
   </div>
   <div id="stage"><canvas id="cv"></canvas><div id="banner"><div class="off"><b></b><span></span></div></div></div>
-  <div id="foot">（試作 v13）</div>
+  <div id="foot">（試作 v14）</div>
 </div>
 
 <div class="ov" id="ovStart">
@@ -204,7 +204,7 @@ function startRun(mode,stage){
   if(mode)MODE=mode; stage=stage||1; 
   if(!AC){try{AC=new (window.AudioContext||window.webkitAudioContext)();}catch(e){}} else if(AC.state==='suspended')AC.resume();
   G={room:0,totalT:0,state:'play',T:0,hz:[],gid:0,shake:0,flash:0,cause:null,erased:[],gained:[]};
-  $('#ovStart').hidden=true; $('#result').hidden=false; $('#foot').textContent=MODES[MODE].foot+'　（試作 v13）';
+  $('#ovStart').hidden=true; $('#result').hidden=false; $('#foot').textContent=MODES[MODE].foot+'　（試作 v14）';
   $('#modeTag').textContent=MODES[MODE].name+(MODE==='paint'&&FLIP?'・反転':''); G.startStage=stage; enterRoom(stage);
 }
 function nearest(fl,tx,ty,not){let best=null,bd=1e9;for(const f of fl){if(not&&f[0]===not[0]&&f[1]===not[1])continue;
@@ -390,9 +390,9 @@ function update(dt){
   for(const h of G.hz)if(h.type==='drone'){const b=G.bots[h.bot]; if(T<h.tl)h.cells=[[b.x,b.y]];
     const [x,y]=h.cells[0]; const k=1-Math.exp(-dt*(T<h.tl?7:30)); h.rx+=(cx(x)+CS/2-h.rx)*k; h.ry+=(cy(y)+CS/2-h.ry)*k;}
   for(const h of G.hz)if(!h.fired&&T>=h.tf){h.fired=true; if(h.type==='beam'||h.type==='panel')beep(110,.35,'sawtooth',.03,90); else if(h.type!=='orb')beep(1200,.12,'sawtooth',.025,300); else beep(200,.3,'triangle',.04,120);}
-  // 撃たれた床は色が消える
+  // 撃たれた床は色が消える（パルスは範囲が広いので消さない）
   // 撃たれたマス：塗ってあれば消える。反転のルールでは、塗っていなければ塗られる（障害 1 つにつき 1 マス 1 回）
-  if(MODE==='paint'){let gain=0; for(const h of G.hz)if(active(h,T)){h.flip=h.flip||new Set(); for(const c of cellsAt(h,T)){const k=c[0]+','+c[1]; if(h.flip.has(k))continue; h.flip.add(k);
+  if(MODE==='paint'){let gain=0; for(const h of G.hz)if(h.type!=='pulse'&&active(h,T)){h.flip=h.flip||new Set(); for(const c of cellsAt(h,T)){const k=c[0]+','+c[1]; if(h.flip.has(k))continue; h.flip.add(k);
     if(G.paint.has(k)){G.paint.delete(k); G.erased.push({x:c[0],y:c[1],t:T});} else if(FLIP){G.paint.set(k,T); G.lastPaint=T; G.gained.push({x:c[0],y:c[1],t:T}); gain++;}}}
     if(gain)beep(900+gain*40,.08,'sine',.03,1400);}
   G.gained=G.gained.filter(e=>T-e.t<.6);
