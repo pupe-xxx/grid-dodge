@@ -83,7 +83,7 @@ details ul{margin:6px 0 0;padding-left:1.2em;line-height:1.7}
     <div class="r"><div id="modeTag"></div><button class="icon" id="mute" aria-label="音の入り切り">音 入</button></div>
   </div>
   <div id="stage"><canvas id="cv"></canvas><div id="banner"><div class="off"><b></b><span></span></div></div></div>
-  <div id="foot">（試作 v11）</div>
+  <div id="foot">（試作 v12）</div>
 </div>
 
 <div class="ov" id="ovStart">
@@ -100,7 +100,6 @@ details ul{margin:6px 0 0;padding-left:1.2em;line-height:1.7}
     <div class="sec">
       <h2>逃げながら塗る<small>ステージを選ぶ</small></h2>
       <p class="lead" style="margin:0">通ったマスが塗られる。目標のマス数を塗ればステージ突破で、次のステージへ続く。</p>
-      <label class="toggle"><input type="checkbox" id="flipOpt" checked><span><b>新ルール：撃たれたマスの色が反転する</b><small>塗ったマスは消え、塗っていないマスは塗られる。障害は自分の列やマスを狙うので、塗っていない所へ誘い込んでかわすと、塗る手伝いになる。外すと「撃たれたら消えるだけ」</small></span></label>
       <div id="stages"></div>
     </div>
     <button class="modeBtn" data-mode="duo"><small>案 1</small><b>二体同時の試験</b><span>ロボットが2体。画面の左半分のフリックで L、右半分で R が動く（キーは WASD と矢印）。しばらく生き延びると出口が2つ開き、L と R がそれぞれの出口に同時に乗れば突破。</span></button>
@@ -144,7 +143,7 @@ function renderStages(){const c=getCleared(); let h='';
     h+='<button class="stg'+(c.has(k)?' done':'')+'" data-stage="'+k+'"><b>'+k+'</b><span>'+n+'×'+n+'<br>'+t+'</span></button>';}
   $('#stages').innerHTML=h;}
 renderStages();
-let FLIP=true;
+let FLIP=false; // 撃たれたマスの色が反転するルール（v11 で試し、本人の判断で外した）
 
 // ---- 音 ----
 let AC=null,muted=false;
@@ -202,10 +201,10 @@ function genRoom(k){
 // ---- 状態 ----
 let G=null;
 function startRun(mode,stage){
-  if(mode)MODE=mode; stage=stage||1; FLIP=$('#flipOpt').checked;
+  if(mode)MODE=mode; stage=stage||1; 
   if(!AC){try{AC=new (window.AudioContext||window.webkitAudioContext)();}catch(e){}} else if(AC.state==='suspended')AC.resume();
   G={room:0,totalT:0,state:'play',T:0,hz:[],gid:0,shake:0,flash:0,cause:null,erased:[],gained:[]};
-  $('#ovStart').hidden=true; $('#result').hidden=false; $('#foot').textContent=MODES[MODE].foot+'　（試作 v11）';
+  $('#ovStart').hidden=true; $('#result').hidden=false; $('#foot').textContent=MODES[MODE].foot+'　（試作 v12）';
   $('#modeTag').textContent=MODES[MODE].name+(MODE==='paint'&&FLIP?'・反転':''); G.startStage=stage; enterRoom(stage);
 }
 function nearest(fl,tx,ty,not){let best=null,bd=1e9;for(const f of fl){if(not&&f[0]===not[0]&&f[1]===not[1])continue;
@@ -220,7 +219,7 @@ function enterRoom(k){
   if(MODE==='paint'){const ratio=paintRatio(k); G.paint=new Map([[bots[0].x+','+bots[0].y,-1]]); G.lastPaint=-1; G.ratio=ratio; G.goal=Math.ceil(fl.length*ratio);}
   bannerQ.length=0; bannerT=0;
   if(MODE==='duo')banner('区画 '+k+'：'+N+'×'+N,'左手で L、右手で R。出口が開いたら、それぞれの出口へ');
-  else banner('ステージ '+k+'：'+N+'×'+N,(G.goal>=fl.length?'床を全部（':'床の '+Math.round(G.ratio*100)+'%（')+G.goal+' マス）塗れば突破。'+(FLIP?'撃たれたマスは色が反転する':'撃たれた床は消える'));
+  else banner('ステージ '+k+'：'+N+'×'+N,(G.goal>=fl.length?'床を全部（':'床の '+Math.round(G.ratio*100)+'%（')+G.goal+' マス）塗れば突破。撃たれた床は消える。熱い床は塗れない間、数に入れない');
   const t=TYPES[Math.min(TYPES.length-1,k)];
   if(k>1&&k<TYPES.length)banner('新しい試験：'+t.name,t.desc);
   beep(330,.3,'sine',.05,880);
@@ -235,6 +234,9 @@ function canEnter(x,y,t){return walk(x,y)&&!blockedAt(x,y,t);}
 
 // 塗る割合：区画 1 は 85%、区画ごとに 3% 増え、区画 6 から全部
 function paintRatio(k){return Math.min(1,.85+(k-1)*.03);}
+// 今の目標：熱い（封鎖・ビームの）間は塗れないマスを、目標から外す
+function need(){const hot=new Set(); for(const h of G.hz)if(h.blocks&&active(h,G.T))for(const c of h.cells){const k=c[0]+','+c[1]; if(!G.paint.has(k))hot.add(k);}
+  return Math.min(G.goal,floors().length-hot.size);}
 // 判定はフリックした瞬間に次のマスへ移る。見た目だけ MOVE 秒かけて滑らせ、着いてからマスの色を変える
 const MOVE=.11, PAINT_T=.2;
 const posOf=b=>[b.x,b.y];
@@ -302,26 +304,42 @@ function orbCell(h,t){const k=Math.round(orbU(h,t)); if(k<0||k>=h.path.length)re
 function cellsAt(h,t){if(h.type!=='orb')return h.cells; const c=orbCell(h,t); return c?[c]:[];}
 function dangerSet(list,t){const s=new Set();for(const h of list)if(active(h,t))for(const c of cellsAt(h,t))s.add(c[0]+','+c[1]);return s;}
 // どのロボットも、撃たれる前に安全なマスへ行けるときだけ出す
+// 逃げ道の保証。人の速さ（見てから REACT 秒で動き出し、HMOVE 秒に 1 マス）で、
+// 今ある障害と新しい障害が全部終わるまで、当たらずにいられる道が実際にあるかを、HSTEP 秒ごとに調べる
+const HSTEP=.1, HMOVE=3, REACT=3;
+function routeOk(list,bx,by,c0){
+  const T0=G.T, end=Math.min(T0+6,Math.max(T0+.5,...list.map(h=>h.te)));
+  const nS=Math.ceil((end-T0)/HSTEP);
+  // まだ止まっていないドローンは、止まった時にいたマスを撃つ。道ごとに「止まった時のマス」を覚えて調べる
+  const dr=list.find(h=>h.type==='drone'&&T0<h.tl), rest=dr?list.filter(h=>h!==dr):list;
+  const US=[-.03,0,.035,.07,HSTEP+.01]; // そのマスにいる間（動く時刻の少しのずれも含む）
+  let st=new Map([[bx+','+by+'|',c0===undefined?REACT:c0]]);
+  for(let s=0;s<=nS;s++){
+    const t=T0+s*HSTEP, ds=new Set(); for(const u of US)for(const k of dangerSet(rest,t+u))ds.add(k); // そのマスにいる次の刻みまでの間ずっと
+    const drHot=dr&&US.some(u=>t+u>=dr.tf&&t+u<dr.te), lockNow=dr&&t>=dr.tl;
+    const nx=new Map();
+    const put=(x,y,c,lock)=>{const k=x+','+y; if(ds.has(k))return; if(lockNow&&!lock)lock=k; if(drHot&&lock===k)return;
+      const key=k+'|'+(lock||''), o=nx.get(key); if(o===undefined||c<o)nx.set(key,c);};
+    for(const [key,c] of st){const [k,lock]=key.split('|'), [x,y]=k.split(',').map(Number);
+      if(s===0){put(x,y,c,lock); continue;}
+      put(x,y,Math.max(0,c-1),lock);
+      if(c===0)for(const [dx,dy] of D4){const ax=x+dx,ay=y+dy; if(walk(ax,ay))put(ax,ay,HMOVE-1,lock);}}
+    if(!nx.size)return false; st=nx;
+  }
+  return true;
+}
 function fair(cands){
   const all=G.hz.concat(cands), needBlock=cands.some(c=>c.blocks), fc=floors().length, nb=G.bots.length;
   const times=[]; for(const c of cands){times.push(c.tf+.02); if(c.blocks)times.push((c.tf+c.te)/2,c.te-.03); if(c.type==='orb')for(let k=0;k<c.path.length;k++)times.push(c.tf+c.per*(k+.6));}
   for(const t of times){const ds=dangerSet(all,t); if(fc-ds.size<(needBlock?2:1)+nb)return false;}
-  for(const c of cands)for(const bb of G.bots){const [px,py]=posOf(bb),b={x:px,y:py};
-    const steps=Math.max(1,Math.floor((c.tf-G.T)/(nb>1?.24:.17)));
-    const ds=dangerSet(all,c.tf+.02), ds2=dangerSet(all,c.tf+.12);
-    const seen=new Set([b.x+','+b.y]); let q=[[b.x,b.y]], ok=false;
-    for(let s=0;s<=steps&&q.length&&!ok;s++){const nq=[];
-      for(const [x,y] of q){const k=x+','+y; if(!ds.has(k)&&!ds2.has(k)){ok=true;break;}
-        for(const [dx,dy] of D4){const nx=x+dx,ny=y+dy,nk=nx+','+ny; if(canEnter(nx,ny,G.T)&&!seen.has(nk)){seen.add(nk);nq.push([nx,ny]);}}}
-      q=nq;}
-    if(!ok)return false;
-  }
+  for(const b of G.bots)if(!routeOk(all,b.x,b.y))return false;
   return true;
 }
 // 出す障害を選ぶ。新しい試験を多めに出す。塗る方では球を少なくし、同時に出る数も絞る（球は通った列の色を順に消し、重いので）
 function pickType(al,T){
   const paint=MODE==='paint', orbCap=N>=5?2:1, orbs=G.hz.filter(h=>h.type==='orb'&&h.te>T).length;
-  const ok=al.filter(id=>!(paint&&id==='orb'&&orbs>=orbCap));
+  const drones=G.hz.some(h=>h.type==='drone'&&h.te>T);
+  const ok=al.filter(id=>!(paint&&id==='orb'&&orbs>=orbCap)&&!(id==='drone'&&drones));
   const newest=al[al.length-1];
   if(G.room<TYPES.length&&ok.includes(newest)&&Math.random()<(paint?.3:.4))return newest;
   const wt=id=>paint&&id==='orb'?.75:1, sum=ok.reduce((a,id)=>a+wt(id),0); let r=Math.random()*sum;
@@ -382,7 +400,7 @@ function update(dt){
   stepBots(T);
   if(!G.god)for(let i=0;i<G.bots.length;i++){const b=G.bots[i]; for(const h of G.hz)if(active(h,T)&&has(cellsAt(h,T),b.x,b.y)){die(h,i);return;}}
   if(MODE==='duo'&&G.exits&&G.bots.every((b,i)=>b.x===G.exits[i][0]&&b.y===G.exits[i][1])){G.state='finish'; G.finishAt=T+MOVE+.2; return;}
-  if(MODE==='paint'&&G.paint.size>=G.goal){G.state='finish'; G.finishAt=Math.max(T,G.lastPaint)+PAINT_T+.2; return;}
+  if(MODE==='paint'&&G.paint.size>=need()){G.state='finish'; G.finishAt=Math.max(T,G.lastPaint)+PAINT_T+.2; return;}
   G.hz=G.hz.filter(h=>h.te>T-.35);
   spawn();
 }
@@ -397,6 +415,7 @@ function die(h,bi){
   setTimeout(showResult,900);
 }
 function showResult(){
+  if(!G||G.state!=='dead')return;
   const cleared=G.room-(G.startStage||1), best=getBest(MODE), cause='当たった障害：<b style="color:'+TMAP[G.cause.type].color+'">'+TMAP[G.cause.type].name+'</b>';
   $('#rHead').textContent='終了：'+MODES[MODE].name+(MODE==='paint'&&FLIP?'（反転）':'');
   if(MODE==='paint'){
@@ -552,7 +571,7 @@ function hud(){
   $('#room').textContent=(MODE==='paint'?'ステージ ':'区画 ')+G.room; $('#shape').textContent=N+'×'+N+'　床 '+floors().length;
   const t=$('#time'), L=$('#midLabel');
   if(G.state==='clear'){L.textContent='突破'; t.textContent='CLEAR'; t.className='open';}
-  else if(MODE==='paint'){L.textContent='塗った床 ／ 目標'; t.textContent=G.paint.size+'/'+G.goal; t.className=G.paint.size>=G.goal-2?'open':'';}
+  else if(MODE==='paint'){L.textContent='塗った床 ／ 目標'; const nd=need(); t.textContent=G.paint.size+'/'+nd; t.className=G.paint.size>=nd-2?'open':'';}
   else if(G.exits){L.textContent='出口が開いた'; t.textContent='L・R 出口へ'; t.className='open'; t.style.fontSize='22px';}
   else {L.textContent='出口が開くまで'; t.textContent=Math.max(0,G.exitAt-G.T).toFixed(1); t.className=''; t.style.fontSize='';}
 }
@@ -593,7 +612,7 @@ app.addEventListener('pointermove',e=>{
 function release(e){touches.delete(e.pointerId);}
 app.addEventListener('pointerup',release); app.addEventListener('pointercancel',release);
 // 試しの撮影用（画面には出ない）
-window.__lab={get G(){return G;},enterRoom:k=>{G.state='play';enterRoom(k);},startRun,genRoom,tryMove,step:update};
+window.__lab={get G(){return G;},enterRoom:k=>{G.state='play';enterRoom(k);},startRun,genRoom,tryMove,step:update,routeOk:(x,y,c)=>routeOk(G.hz,x,y,c),walk:(x,y)=>walk(x,y)};
 })();
 </script>
 </body>
