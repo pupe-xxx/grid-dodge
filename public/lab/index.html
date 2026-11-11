@@ -83,7 +83,7 @@ details ul{margin:6px 0 0;padding-left:1.2em;line-height:1.7}
     <div class="r"><div id="modeTag"></div><button class="icon" id="mute" aria-label="音の入り切り">音 入</button></div>
   </div>
   <div id="stage"><canvas id="cv"></canvas><div id="banner"><div class="off"><b></b><span></span></div></div></div>
-  <div id="foot">（試作 v15）</div>
+  <div id="foot">（試作 v16）</div>
 </div>
 
 <div class="ov" id="ovStart">
@@ -118,9 +118,10 @@ const TYPES=[
  {id:'sweep', name:'掃引レーザー', color:'#ff4d6d', desc:'番号の順に1列ずつ撃つ。撃ち終わった列へ逃げる'},
  {id:'drone', name:'照準ドローン', color:'#ffd43b', desc:'照準がロボットを追い、止まってから撃つ。止まったら外す'},
  {id:'pulse', name:'パルス',       color:'#7dff9a', desc:'中心から輪が外へ広がる。撃ち終わった内側へ戻る'},
- {id:'eraser',name:'消し弾',       color:'#ff2fd2', desc:'塗った色を消すのはこの弾だけ。1列を速く進み、通ったマスの色を消す。当たると倒れる。柱で止まる'},
+ {id:'eraser',name:'消し弾',       color:'#ff2fd2', desc:'塗った色を消すのはこの赤紫の弾だけ。塗ったマスの多い列を狙って速く進み、通ったマスの色を消す。当たると倒れる。柱で止まる'},
 ];
 const TMAP=Object.fromEntries(TYPES.map(t=>[t.id,t]));
+const STYPES=TYPES.filter(t=>t.id!=='eraser'); // ステージで順に増える試験（消し弾は塗る方で毎回出る）
 const MODES={duo:{name:'二体同時',foot:'左半分のフリックで L、右半分で R（指を離して次へ）／ キーは WASD と矢印'},
              paint:{name:'逃げながら塗る',foot:'フリックで1マス（指を離して次へ・両手で可）／ キーは矢印・WASD'}};
 const BOTC=['#4fd8ff','#f4f1ff'], BOTN=['L','R'];
@@ -136,11 +137,11 @@ function setBest(m,v){try{localStorage.setItem(bestKey(m),String(v));}catch(e){}
 function showBest(){const a=getBest('duo'),b=getBest('paint');
   $('#bestNote').textContent=(a||b)?'これまでの最高：二体同時 区画 '+a+'　／　塗る 区画 '+b+'（突破した数）':'';}
 showBest();
-const STAGES=8;
+const STAGES=7;
 function getCleared(){try{return new Set(JSON.parse(localStorage.getItem('gdlab-paint-cleared')||'[]'));}catch(e){return new Set();}}
 function addCleared(k){const c=getCleared(); c.add(k); try{localStorage.setItem('gdlab-paint-cleared',JSON.stringify([...c]));}catch(e){}}
 function renderStages(){const c=getCleared(); let h='';
-  for(let k=1;k<=STAGES;k++){const n=Math.min(8,3+k), t=k===1?'レーザー・球':k>=TYPES.length?'全部の試験':TYPES[k].name;
+  for(let k=1;k<=STAGES;k++){const n=Math.min(8,3+k), t=k===1?'レーザー・球':k>=STYPES.length?'全部の試験':STYPES[k].name;
     h+='<button class="stg'+(c.has(k)?' done':'')+'" data-stage="'+k+'"><b>'+k+'</b><span>'+n+'×'+n+'<br>'+t+'</span></button>';}
   $('#stages').innerHTML=h;}
 renderStages();
@@ -177,13 +178,16 @@ function connected(m,n){let start=-1,cnt=0;for(let i=0;i<m.length;i++)if(m[i]===
     if(nx>=0&&ny>=0&&nx<n&&ny<n&&m[j]===1&&!seen.has(j)){seen.add(j);q.push(j);}}}
   return seen.size===cnt;}
 function nb(m,n,i){const x=i%n,y=(i/n)|0;let c=0;for(const [dx,dy] of D4){const nx=x+dx,ny=y+dy;if(nx>=0&&ny>=0&&nx<n&&ny<n&&m[ny*n+nx]===1)c++;}return c;}
+// 床の最低の数（形がどうでも、塗るマスが少なすぎて簡単にならないように）
+const MINF=[0,16,16,22,28,34,38,40];
+function minFloors(k){return MINF[Math.min(MINF.length-1,k)];}
 function genRoom(k){
-  const n=Math.min(8,3+k);
+  const n=Math.min(8,3+k), mf=Math.min(minFloors(k),n*n);
   for(let tries=0;tries<400;tries++){
     let m=new Array(n*n).fill(0);
     if(k===1)m.fill(1);
     else{
-      const goal=Math.round(n*n*lerp(.5,.85,Math.random())), seeds=1+ri(3); let cnt=0;
+      const goal=Math.min(n*n-1,Math.max(mf+3,Math.round(n*n*lerp(.5,.85,Math.random())))), seeds=1+ri(3); let cnt=0;
       for(let s=0;s<seeds;s++){const i=ri(n*n); if(!m[i]){m[i]=1;cnt++;}}
       for(let g=0;cnt<goal&&g<6000;g++){const fl=[];for(let i=0;i<m.length;i++)if(m[i]===1)fl.push(i);
         const i=fl[ri(fl.length)],x=i%n,y=(i/n)|0,[dx,dy]=D4[ri(4)],nx=x+dx,ny=y+dy;
@@ -194,7 +198,7 @@ function genRoom(k){
     for(let ch=true;ch;){ch=false; for(let i=0;i<m.length;i++)if(m[i]===1&&nb(m,n,i)<2){m[i]=0;ch=true;}}
     for(let i=0;i<m.length;i++)if(m[i]===2&&nb(m,n,i)<2)m[i]=0; // 床から離れた柱は消す
     const fc=m.filter(v=>v===1).length;
-    if(fc>=Math.max(9,n*n*.4)&&connected(m,n))return {n,m};
+    if(fc>=mf&&connected(m,n))return {n,m};
   }
   return {n,m:new Array(n*n).fill(1)};
 }
@@ -205,7 +209,7 @@ function startRun(mode,stage){
   if(mode)MODE=mode; stage=stage||1; 
   if(!AC){try{AC=new (window.AudioContext||window.webkitAudioContext)();}catch(e){}} else if(AC.state==='suspended')AC.resume();
   G={room:0,totalT:0,state:'play',T:0,hz:[],gid:0,shake:0,flash:0,cause:null,erased:[],gained:[]};
-  $('#ovStart').hidden=true; $('#result').hidden=false; $('#foot').textContent=MODES[MODE].foot+'　（試作 v15）';
+  $('#ovStart').hidden=true; $('#result').hidden=false; $('#foot').textContent=MODES[MODE].foot+'　（試作 v16）';
   $('#modeTag').textContent=MODES[MODE].name+(MODE==='paint'&&FLIP?'・反転':''); G.startStage=stage; enterRoom(stage);
 }
 function nearest(fl,tx,ty,not){let best=null,bd=1e9;for(const f of fl){if(not&&f[0]===not[0]&&f[1]===not[1])continue;
@@ -216,18 +220,19 @@ function enterRoom(k){
   if(MODE==='duo'){const a=nearest(fl,c-1.5,c), b=nearest(fl,c+1.5,c,a); bots.push(mk(a),mk(b));}
   else bots.push(mk(nearest(fl,c,c)));
   function mk(p){return {x:p[0],y:p[1],tx:p[0],ty:p[1],fx:p[0],fy:p[1],mt:0,moving:false,q:null,vx:p[0],vy:p[1],bump:null};}
-  Object.assign(G,{room:k,state:'play',T:0,hz:[],bots,exits:null,exitAt:Math.min(20,11+k*1.5),nextSpawn:.9,enter:1,erased:[],gained:[]});
+  Object.assign(G,{room:k,state:'play',T:0,hz:[],bots,exits:null,exitAt:Math.min(20,11+k*1.5),nextSpawn:.9,nextEraser:2.2,enter:1,erased:[],gained:[]});
   if(MODE==='paint'){const ratio=paintRatio(k); G.paint=new Map([[bots[0].x+','+bots[0].y,-1]]); G.lastPaint=-1; G.ratio=ratio; G.goal=Math.ceil(fl.length*ratio);}
   bannerQ.length=0; bannerT=0;
   if(MODE==='duo')banner('区画 '+k+'：'+N+'×'+N,'左手で L、右手で R。出口が開いたら、それぞれの出口へ');
   else banner('ステージ '+k+'：'+N+'×'+N,(G.goal>=fl.length?'床を全部（':'床の '+Math.round(G.ratio*100)+'%（')+G.goal+' マス）塗れば突破。色を消すのは赤紫の消し弾だけ。熱い床は塗れない間、数に入れない');
-  const t=TYPES[Math.min(TYPES.length-1,k)];
-  if(k>1&&k<TYPES.length&&!(MODE==='duo'&&t.id==='eraser'))banner('新しい試験：'+t.name,t.desc);
+  const t=STYPES[Math.min(STYPES.length-1,k)];
+  if(MODE==='paint'&&k===1)banner('消し弾',TMAP.eraser.desc);
+  if(k>1&&k<STYPES.length)banner('新しい試験：'+t.name,t.desc);
   beep(330,.3,'sine',.05,880);
 }
 function diff(){return clamp((MODE==='duo'?.08:.12)+(G.room-1)*(MODE==='duo'?.08:.1)+G.T/45);}
 function warnTime(){return lerp(1.0,.5,diff())*(MODE==='duo'?1.15:1);}
-function allowed(){return TYPES.slice(0,Math.min(TYPES.length,G.room+1)).map(t=>t.id).filter(id=>MODE==='paint'||id!=='eraser');}
+function allowed(){return STYPES.slice(0,Math.min(STYPES.length,G.room+1)).map(t=>t.id);}
 function active(h,t){return t>=h.tf&&t<h.te;}
 const has=(cells,x,y)=>cells.some(c=>c[0]===x&&c[1]===y);
 function blockedAt(x,y,t){return G.hz.some(h=>h.blocks&&active(h,t)&&has(h.cells,x,y));}
@@ -271,12 +276,16 @@ function pickLine(b,aim){
   return null;}
 function mkLine(type,L,t0,tf,dur,extra){const tr=travel(L.axis,L.idx,L.side);
   return Object.assign({type,axis:L.axis,idx:L.idx,side:L.side,path:tr.path,stop:tr.stop,cells:tr.path.filter(c=>walk(c[0],c[1])),t0,tf,te:tf+dur,blocks:type==='beam'},extra||{});}
+function eraserLine(){const c=[];
+  for(const axis of ['row','col'])for(let idx=0;idx<N;idx++)for(const side of [0,1]){const tr=travel(axis,idx,side); if(!tr.path.some(q=>walk(q[0],q[1])))continue;
+    const n=tr.path.filter(q=>G.paint.has(q[0]+','+q[1])).length; c.push([{axis,idx,side},n+Math.random()*2.5]);}
+  c.sort((a,b)=>b[1]-a[1]); return c.length?c[ri(Math.min(4,c.length))][0]:null;}
 function randFloor(){const f=floors();return f[ri(f.length)];}
 function build(type,bi,aim){
   const T=G.T,w=warnTime(),d=diff(),gid=++G.gid,[bx,by]=posOf(G.bots[bi]),b={x:bx,y:by};
   if(type==='laser'){const L=pickLine(b,aim); return L&&[mkLine('laser',L,T,T+w,.16,{gid})];}
   if(type==='orb'){const L=pickLine(b,aim); if(!L)return null; const per=lerp(.62,.34,d), tf=T+w*.9; const h=mkLine('orb',L,T,tf,0,{gid,per,blocks:false}); h.te=tf+(h.path.length+.7)*per; h.cells=[]; return [h];}
-  if(type==='eraser'){const L=pickLine(b,aim); if(!L)return null; const per=lerp(.36,.24,d), tf=T+w*.95; const h=mkLine('eraser',L,T,tf,0,{gid,per,blocks:false}); h.te=tf+(h.path.length+.7)*per; h.cells=[]; return [h];}
+  if(type==='eraser'){const L=aim?eraserLine():pickLine(b,false); if(!L)return null; const per=lerp(.36,.24,d), tf=T+w*.95; const h=mkLine('eraser',L,T,tf,0,{gid,per,blocks:false}); h.te=tf+(h.path.length+.7)*per; h.cells=[]; return [h];}
   if(type==='beam'){const L=pickLine(b,aim); return L&&[mkLine('beam',L,T,T+w*1.1,2.3+Math.random()*1.1,{gid})];}
   if(type==='panel'){
     const cells=[aim?[b.x,b.y]:randFloor()]; const k=MODE==='paint'?(N>=5?3:2):(N>=5&&d>.35?2:1);
@@ -341,17 +350,25 @@ function fair(cands){
 // 出す障害を選ぶ。新しい試験を多めに出す。塗る方では球を少なくし、同時に出る数も絞る（球は通った列の色を順に消し、重いので）
 function pickType(al,T){
   const paint=MODE==='paint', orbCap=N>=5?2:1, orbs=G.hz.filter(h=>h.type==='orb'&&h.te>T).length;
-  const drones=G.hz.some(h=>h.type==='drone'&&h.te>T), erasers=G.hz.filter(h=>h.type==='eraser'&&h.te>T).length;
-  const ok=al.filter(id=>!(paint&&id==='orb'&&orbs>=orbCap)&&!(id==='drone'&&drones)&&!(id==='eraser'&&erasers>=2));
+  const drones=G.hz.some(h=>h.type==='drone'&&h.te>T);
+  const ok=al.filter(id=>!(paint&&id==='orb'&&orbs>=orbCap)&&!(id==='drone'&&drones));
   const newest=al[al.length-1];
-  if(G.room<TYPES.length&&ok.includes(newest)&&Math.random()<(paint?.3:.4))return newest;
+  if(G.room<STYPES.length&&ok.includes(newest)&&Math.random()<(paint?.3:.4))return newest;
   const wt=id=>paint&&id==='orb'?.75:1, sum=ok.reduce((a,id)=>a+wt(id),0); let r=Math.random()*sum;
   for(const id of ok){r-=wt(id); if(r<=0)return id;} return ok[ok.length-1];
 }
+function eraserGap(){return lerp(3.6,1.9,clamp((G.room-1)/6))*(.8+Math.random()*.4);}
+function spawnEraser(){
+  const T=G.T; if(MODE!=='paint')return; if(G.nextEraser===undefined)G.nextEraser=2.2; if(T<G.nextEraser)return;
+  if(G.hz.filter(h=>h.type==='eraser'&&h.te>T).length>=(G.room>=5?3:2)){G.nextEraser=T+.3;return;}
+  for(let i=0;i<10;i++){const c=build('eraser',0,i<7); if(c&&c.length&&fair(c)){G.hz.push(...c); beep(520,.08,'square',.025); G.nextEraser=T+eraserGap(); return;}}
+  G.nextEraser=T+.2;
+}
 function spawn(){
+  spawnEraser();
   const T=G.T,d=diff();
   if(T<G.nextSpawn)return;
-  const live=new Set(G.hz.filter(h=>h.te>T).map(h=>h.gid)).size;
+  const live=new Set(G.hz.filter(h=>h.te>T&&h.type!=='eraser').map(h=>h.gid)).size;
   const maxC=(d<.3?1:d<.6?2:3)+(N>=7?1:0);
   if(live>=maxC){G.nextSpawn=T+.15;return;}
   const al=allowed(), type=pickType(al,T);
