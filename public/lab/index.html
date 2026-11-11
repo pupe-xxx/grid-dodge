@@ -70,7 +70,7 @@ details ul{margin:6px 0 0;padding-left:1.2em;line-height:1.7}
     <div class="r"><div id="modeTag"></div><button class="icon" id="mute" aria-label="音の入り切り">音 入</button></div>
   </div>
   <div id="stage"><canvas id="cv"></canvas><div id="banner"><div class="off"><b></b><span></span></div></div></div>
-  <div id="foot">（試作 v9）</div>
+  <div id="foot">（試作 v10）</div>
 </div>
 
 <div class="ov" id="ovStart">
@@ -178,7 +178,7 @@ function startRun(mode){
   if(mode)MODE=mode;
   if(!AC){try{AC=new (window.AudioContext||window.webkitAudioContext)();}catch(e){}} else if(AC.state==='suspended')AC.resume();
   G={room:0,totalT:0,state:'play',T:0,hz:[],gid:0,shake:0,flash:0,cause:null,erased:[]};
-  $('#ovStart').hidden=true; $('#result').hidden=false; $('#foot').textContent=MODES[MODE].foot+'　（試作 v9）';
+  $('#ovStart').hidden=true; $('#result').hidden=false; $('#foot').textContent=MODES[MODE].foot+'　（試作 v10）';
   $('#modeTag').textContent=MODES[MODE].name; enterRoom(1);
 }
 function nearest(fl,tx,ty,not){let best=null,bd=1e9;for(const f of fl){if(not&&f[0]===not[0]&&f[1]===not[1])continue;
@@ -248,7 +248,11 @@ function build(type,bi,aim){
   if(type==='orb'){const L=pickLine(b,aim); if(!L)return null; const per=lerp(.62,.34,d), tf=T+w*.9; const h=mkLine('orb',L,T,tf,0,{gid,per,blocks:false}); h.te=tf+(h.path.length+.7)*per; h.cells=[]; return [h];}
   if(type==='beam'){const L=pickLine(b,aim); return L&&[mkLine('beam',L,T,T+w*1.1,2.3+Math.random()*1.1,{gid})];}
   if(type==='panel'){
-    const cells=[aim?[b.x,b.y]:randFloor()]; const k=N>=5&&d>.35?2:1;
+    const cells=[aim?[b.x,b.y]:randFloor()]; const k=MODE==='paint'?(N>=5?3:2):(N>=5&&d>.35?2:1);
+    // 塗る方では、ロボットの近くの塗ったマスを狙って熱くする（熱くなると色が消える）
+    if(MODE==='paint'){const pc=[...G.paint.keys()].map(q=>q.split(',').map(Number)).filter(c=>walk(c[0],c[1])&&!has(cells,c[0],c[1]))
+      .map(c=>[c,Math.abs(c[0]-b.x)+Math.abs(c[1]-b.y)+Math.random()*1.5]).sort((p,q)=>p[1]-q[1]);
+      for(const [c] of pc){if(cells.length>=k)break; cells.push(c);}}
     for(let g=0;cells.length<k&&g<20;g++){const c=randFloor(); if(!has(cells,c[0],c[1]))cells.push(c);}
     return [{type:'panel',cells,t0:T,tf:T+w*1.05,te:T+w*1.05+2.4+Math.random(),blocks:true,gid}];
   }
@@ -287,13 +291,22 @@ function fair(cands){
   }
   return true;
 }
+// 出す障害を選ぶ。新しい試験を多めに出す。塗る方では球を少なくし、同時に出る数も絞る（球は通った列の色を順に消し、重いので）
+function pickType(al,T){
+  const paint=MODE==='paint', orbCap=N>=7?2:1, orbs=G.hz.filter(h=>h.type==='orb'&&h.te>T).length;
+  const ok=al.filter(id=>!(paint&&id==='orb'&&orbs>=orbCap));
+  const newest=al[al.length-1];
+  if(G.room<TYPES.length&&ok.includes(newest)&&Math.random()<(paint?.3:.4))return newest;
+  const wt=id=>paint&&id==='orb'?.5:1, sum=ok.reduce((a,id)=>a+wt(id),0); let r=Math.random()*sum;
+  for(const id of ok){r-=wt(id); if(r<=0)return id;} return ok[ok.length-1];
+}
 function spawn(){
   const T=G.T,d=diff();
   if(T<G.nextSpawn)return;
   const live=new Set(G.hz.filter(h=>h.te>T).map(h=>h.gid)).size;
   const maxC=(d<.3?1:d<.6?2:3)+(N>=7?1:0);
   if(live>=maxC){G.nextSpawn=T+.15;return;}
-  const al=allowed(); let type=(G.room<TYPES.length&&Math.random()<.4)?al[al.length-1]:al[ri(al.length)];
+  const al=allowed(), type=pickType(al,T);
   const bi=ri(G.bots.length); let placed=false;
   // まず狙って出す。無理なら狙わずに出す。どちらも無理なら少し待って出し直す（飛ばさない）
   for(let i=0;i<14&&!placed;i++){const c=build(type,bi,i<9); if(c&&c.length&&fair(c)){G.hz.push(...c); placed=true; beep(type==='drone'?880:330,.08,'sine',.03);}}
