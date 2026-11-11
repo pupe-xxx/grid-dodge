@@ -83,7 +83,7 @@ details ul{margin:6px 0 0;padding-left:1.2em;line-height:1.7}
     <div class="r"><div id="modeTag"></div><button class="icon" id="mute" aria-label="音の入り切り">音 入</button></div>
   </div>
   <div id="stage"><canvas id="cv"></canvas><div id="banner"><div class="off"><b></b><span></span></div></div></div>
-  <div id="foot">（試作 v12）</div>
+  <div id="foot">（試作 v13）</div>
 </div>
 
 <div class="ov" id="ovStart">
@@ -204,7 +204,7 @@ function startRun(mode,stage){
   if(mode)MODE=mode; stage=stage||1; 
   if(!AC){try{AC=new (window.AudioContext||window.webkitAudioContext)();}catch(e){}} else if(AC.state==='suspended')AC.resume();
   G={room:0,totalT:0,state:'play',T:0,hz:[],gid:0,shake:0,flash:0,cause:null,erased:[],gained:[]};
-  $('#ovStart').hidden=true; $('#result').hidden=false; $('#foot').textContent=MODES[MODE].foot+'　（試作 v12）';
+  $('#ovStart').hidden=true; $('#result').hidden=false; $('#foot').textContent=MODES[MODE].foot+'　（試作 v13）';
   $('#modeTag').textContent=MODES[MODE].name+(MODE==='paint'&&FLIP?'・反転':''); G.startStage=stage; enterRoom(stage);
 }
 function nearest(fl,tx,ty,not){let best=null,bd=1e9;for(const f of fl){if(not&&f[0]===not[0]&&f[1]===not[1])continue;
@@ -455,8 +455,8 @@ function drawRoom(T){
     const v=at(x,y); if(!v)continue;
     const X=cx(x),Y=cy(y); ctx.globalAlpha=e>0?clamp(1-e*1.4+((x+y)/(2*N))*.8):1;
     if(v===1){const pt0=G&&MODE==='paint'&&G.paint?G.paint.get(x+','+y):undefined, painted=pt0!==undefined&&T>=pt0, pa=painted?clamp((T-pt0)/PAINT_T):0;
-      ctx.fillStyle=painted&&pa>.5?'#0f3a4c':'#0c1520'; rr(X,Y,CS,CS,4); ctx.fill(); ctx.strokeStyle=painted?'rgba(79,216,255,.75)':'rgba(79,216,255,.22)'; ctx.lineWidth=painted?2:1; ctx.stroke();
-      if(painted){const o=CS*(.5-.32*pa); ctx.fillStyle='rgba(79,216,255,'+(.18+.5*(1-pa))+')'; rr(X+o,Y+o,CS-2*o,CS-2*o,3); ctx.fill();}
+      ctx.fillStyle=painted&&pa>.5?'#1a6f8e':'#172c40'; rr(X,Y,CS,CS,4); ctx.fill(); ctx.strokeStyle=painted?'#86eaff':'rgba(140,205,240,.55)'; ctx.lineWidth=painted?2.5:1.5; ctx.stroke();
+      if(painted){const o=CS*(.5-.36*pa); ctx.fillStyle='rgba(150,235,255,'+(.3+.5*(1-pa))+')'; rr(X+o,Y+o,CS-2*o,CS-2*o,3); ctx.fill();}
       ctx.fillStyle='rgba(79,216,255,.35)'; const k=Math.max(3,CS*.08);
       ctx.fillRect(X+3,Y+3,k,1.5); ctx.fillRect(X+3,Y+3,1.5,k); ctx.fillRect(X+CS-3-k,Y+CS-4.5,k,1.5); ctx.fillRect(X+CS-4.5,Y+CS-3-k,1.5,k);}
     else{ // 柱
@@ -489,8 +489,13 @@ function drawHazards(T){
       }
     }
     if(h.type==='pulse'){
-      if(h.r===0&&T<h.tf){const [x,y]=h.center,X=cx(x)+CS/2,Y=cy(y)+CS/2; ctx.fillStyle=col; ctx.globalAlpha=.25+.5*f; ctx.beginPath(); ctx.arc(X,Y,CS*.12+CS*.2*f,0,7); ctx.fill(); ctx.globalAlpha=1;}
-      if(T<h.tf&&h.r>0){ctx.strokeStyle=col; ctx.globalAlpha=.25+.35*f; ctx.setLineDash([4,4]); ctx.lineWidth=1.5;
+      if(T<h.tf){const [x,y]=h.center, r=h.r, soon=clamp(1-(h.tf-T)/1.0);
+        ctx.fillStyle=col; ctx.globalAlpha=.1+.3*soon; for(const [a,b2] of h.cells){rr(cx(a),cy(b2),CS,CS,4); ctx.fill();}
+        // 次に撃つ輪（同じパルスで一番早い未発射の輪）は実線の枠
+        const next=!G.hz.some(o=>o.gid===h.gid&&o.type==='pulse'&&o.tf<h.tf&&T<o.te);
+        if(next){ctx.strokeStyle=col; ctx.globalAlpha=.6+.4*soon; ctx.lineWidth=2.5; for(const [a,b2] of h.cells){rr(cx(a)+2,cy(b2)+2,CS-4,CS-4,4); ctx.stroke();}}
+        ctx.globalAlpha=1;}
+      if(false){
         for(const [x,y] of h.cells){rr(cx(x)+3,cy(y)+3,CS-6,CS-6,4); ctx.stroke();} ctx.setLineDash([]); ctx.globalAlpha=1;}
       if(act){glow(col,16); ctx.fillStyle=col; ctx.globalAlpha=.8; for(const [x,y] of h.cells){rr(cx(x),cy(y),CS,CS,4); ctx.fill();} ctx.shadowBlur=0; ctx.globalAlpha=1;}
     }
@@ -514,7 +519,7 @@ function drawHazards(T){
     if(h.type!=='laser'&&h.type!=='beam'&&h.type!=='sweep')continue;
     const col=TMAP[h.type].color, f=clamp((T-h.t0)/(h.tf-h.t0)), g=lineGeo(h), [ex,ey]=emitter(h,g), a0=h.side?g.e+16:g.s-16, a1=lineEnd(h,g);
     if(T<h.tf){
-      ctx.fillStyle=col; ctx.globalAlpha=.06+.12*f; for(const c of h.cells){rr(cx(c[0]),cy(c[1]),CS,CS,4); ctx.fill();}
+      ctx.fillStyle=col; ctx.globalAlpha=.12+.22*f; for(const c of h.cells){rr(cx(c[0]),cy(c[1]),CS,CS,4); ctx.fill();}
       ctx.globalAlpha=.9; band(h,g,a0,lerp(a0,a1,f),2);
       if(h.stop){const [x,y]=pt(h,g,a1); ctx.globalAlpha=.5; ctx.fillRect(x-4,y-4,8,8);}
       ctx.globalAlpha=1; glow(col,8+10*f); ctx.beginPath(); ctx.arc(ex,ey,3+4*f,0,7); ctx.fill(); ctx.shadowBlur=0;
@@ -538,6 +543,15 @@ function drawHazards(T){
     ctx.restore(); ctx.shadowBlur=0;
     if(lock){const [x,y]=h.cells[0]; ctx.fillStyle=col; ctx.globalAlpha=.12+.25*f; rr(cx(x),cy(y),CS,CS,4); ctx.fill(); ctx.globalAlpha=1;}
   }
+}
+// パルスの中心は、ロボットの上にも見えるように最後に描く
+function drawPulseCenters(T){
+  for(const h of G.hz){ if(h.type!=='pulse'||h.r!==0||T>=h.tf)continue;
+    const col=TMAP.pulse.color, f=clamp((T-h.t0)/(h.tf-h.t0)), [x,y]=h.center, X=cx(x), Y=cy(y), mx=X+CS/2, my=Y+CS/2;
+    glow(col,14); ctx.strokeStyle=col; ctx.lineWidth=4; rr(X-3,Y-3,CS+6,CS+6,6); ctx.stroke(); ctx.shadowBlur=0;
+    const L=CS*.32; ctx.lineWidth=3; for(const [dx,dy] of D4){ctx.beginPath(); ctx.moveTo(mx+dx*(CS/2+4),my+dy*(CS/2+4)); ctx.lineTo(mx+dx*(CS/2+4+L),my+dy*(CS/2+4+L)); ctx.stroke();}
+    const q=(T*1.5)%1; ctx.globalAlpha=1-q; ctx.lineWidth=2; const o=q*CS*.9; rr(X-3-o,Y-3-o,CS+6+2*o,CS+6+2*o,6); ctx.stroke(); ctx.globalAlpha=1;
+    ctx.fillStyle=col; ctx.font='700 11px '+FJP; ctx.textAlign='center'; ctx.textBaseline='bottom'; ctx.fillText('パルス '+(h.tf-T).toFixed(1),mx,Y-6-L);}
 }
 function drawBots(T){
   G.bots.forEach((b,i)=>{
@@ -563,7 +577,7 @@ function draw(){
     ctx.fillStyle=BOTC[0]; ctx.fillText('L',W*.25,H-4); ctx.fillStyle=BOTC[1]; ctx.fillText('R',W*.75,H-4); ctx.globalAlpha=1;}
   if(G&&G.shake>0)ctx.translate((Math.random()-.5)*12*G.shake,(Math.random()-.5)*12*G.shake);
   drawRoom(T);
-  if(G){ if(G.state!=='clear')drawHazards(T); drawBots(T);
+  if(G){ if(G.state!=='clear')drawHazards(T); drawBots(T); if(G.state==='play')drawPulseCenters(T);
     if(G.flash>0){ctx.setTransform(DPR,0,0,DPR,0,0); ctx.fillStyle='rgba(255,77,109,'+(G.flash*.35)+')'; ctx.fillRect(0,0,W,H);}}
 }
 function hud(){
