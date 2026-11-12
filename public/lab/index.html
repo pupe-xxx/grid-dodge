@@ -66,6 +66,12 @@ h1 span{color:var(--accent)}
 .stg.done{border-color:var(--exit)}
 .stg.done b::after{content:" \2713";color:var(--exit);font-size:13px}
 .stg:active{border-color:var(--accent)}
+#kinds{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.kind{background:#0f1a26;color:var(--dim);border:1px solid var(--edge);border-radius:8px;padding:10px 6px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;font-family:var(--f-jp);min-height:64px}
+.kind b{font-size:15px;color:var(--ink)}
+.kind span{font-size:11px;line-height:1.35;text-align:center}
+.kind[aria-pressed="true"]{border-color:var(--accent);background:#10283a;box-shadow:inset 0 -3px 0 var(--accent)}
+.kind[aria-pressed="true"] b{color:var(--accent)}
 .toggle{display:flex;gap:10px;align-items:flex-start;font-size:13px;line-height:1.6;cursor:pointer}
 .toggle input{margin-top:4px;width:18px;height:18px;accent-color:var(--accent);flex:none}
 .toggle span small{display:block;font-size:12px;color:var(--dim)}
@@ -83,7 +89,7 @@ details ul{margin:6px 0 0;padding-left:1.2em;line-height:1.7}
     <div class="r"><div id="modeTag"></div><button class="icon" id="mute" aria-label="音の入り切り">音 入</button></div>
   </div>
   <div id="stage"><canvas id="cv"></canvas><div id="banner"><div class="off"><b></b><span></span></div></div></div>
-  <div id="foot">（試作 v16）</div>
+  <div id="foot">（試作 v17）</div>
 </div>
 
 <div class="ov" id="ovStart">
@@ -98,8 +104,13 @@ details ul{margin:6px 0 0;padding-left:1.2em;line-height:1.7}
       <p class="lead">被験体のロボットで、試験区画を1つずつ抜けていく。区画の形は毎回ちがう。当たったら最初から。</p>
     </div>
     <div class="sec">
-      <h2>逃げながら塗る<small>ステージを選ぶ</small></h2>
-      <p class="lead" style="margin:0">通ったマスが塗られる。目標のマス数を塗ればステージ突破で、次のステージへ続く。</p>
+      <h2>遊び方を選ぶ<small>その下でステージを選ぶ</small></h2>
+      <div id="kinds">
+        <button class="kind" data-kind="cut"><b>遮断</b><span>行・列をそろえて発射口を止める</span></button>
+        <button class="kind" data-kind="wire"><b>配線</b><span>電源から端子へつないで充電</span></button>
+        <button class="kind" data-kind="paint"><b>塗る</b><span>前の版（v16）</span></button>
+      </div>
+      <p class="lead" id="kindLead" style="margin:0"></p>
       <div id="stages"></div>
     </div>
     <button class="modeBtn" data-mode="duo"><small>案 1</small><b>二体同時の試験</b><span>ロボットが2体。画面の左半分のフリックで L、右半分で R が動く（キーは WASD と矢印）。しばらく生き延びると出口が2つ開き、L と R がそれぞれの出口に同時に乗れば突破。</span></button>
@@ -123,7 +134,16 @@ const TYPES=[
 const TMAP=Object.fromEntries(TYPES.map(t=>[t.id,t]));
 const STYPES=TYPES.filter(t=>t.id!=='eraser'); // ステージで順に増える試験（消し弾は塗る方で毎回出る）
 const MODES={duo:{name:'二体同時',foot:'左半分のフリックで L、右半分で R（指を離して次へ）／ キーは WASD と矢印'},
-             paint:{name:'逃げながら塗る',foot:'フリックで1マス（指を離して次へ・両手で可）／ キーは矢印・WASD'}};
+             paint:{name:'逃げながら塗る',foot:'フリックで1マス（指を離して次へ・両手で可）／ キーは矢印・WASD'},
+             cut:{name:'遮断',foot:'フリックで1マス（指を離して次へ・両手で可）／ キーは矢印・WASD'},
+             wire:{name:'配線',foot:'フリックで1マス（指を離して次へ・両手で可）／ キーは矢印・WASD'}};
+// 遊び方の説明（始める画面）
+const KINDS={
+  cut:'通ったマスが青く塗られる。行か列の床を全部塗ると、その発射口が壊れ、その列は緑で確定して消されなくなる。予告の途中でも、塗りそろえれば攻撃ごと止まる。全部の発射口を止めればステージ突破。',
+  wire:'スタートのマスが電源。通った跡が配線になり、電源からつながっている端子だけ充電が進む。満タンで確定し、新しい電源になる。消し弾に切られたら、切れたマスを踏んでつなぎ直す。全部の端子を充電すればステージ突破。',
+  paint:'通ったマスが塗られる。目標のマス数を塗ればステージ突破で、次のステージへ続く。'};
+const PAINTY=()=>MODE!=='duo'; // 通ったマスが塗られる遊び方（塗る・遮断・配線）
+const VER='v17';
 const BOTC=['#4fd8ff','#f4f1ff'], BOTN=['L','R'];
 const $=s=>document.querySelector(s);
 const cv=$('#cv'),ctx=cv.getContext('2d'),stage=$('#stage');
@@ -138,13 +158,17 @@ function showBest(){const a=getBest('duo'),b=getBest('paint');
   $('#bestNote').textContent=(a||b)?'これまでの最高：二体同時 区画 '+a+'　／　塗る 区画 '+b+'（突破した数）':'';}
 showBest();
 const STAGES=7;
-function getCleared(){try{return new Set(JSON.parse(localStorage.getItem('gdlab-paint-cleared')||'[]'));}catch(e){return new Set();}}
-function addCleared(k){const c=getCleared(); c.add(k); try{localStorage.setItem('gdlab-paint-cleared',JSON.stringify([...c]));}catch(e){}}
-function renderStages(){const c=getCleared(); let h='';
+let KIND='cut'; try{const k=localStorage.getItem('gdlab-kind'); if(k&&KINDS[k])KIND=k;}catch(e){}
+function getCleared(m){try{return new Set(JSON.parse(localStorage.getItem('gdlab-'+(m||KIND)+'-cleared')||'[]'));}catch(e){return new Set();}}
+function addCleared(m,k){const c=getCleared(m); c.add(k); try{localStorage.setItem('gdlab-'+m+'-cleared',JSON.stringify([...c]));}catch(e){}}
+function renderStages(){const c=getCleared(KIND); let h='';
   for(let k=1;k<=STAGES;k++){const n=Math.min(8,3+k), t=k===1?'レーザー・球':k>=STYPES.length?'全部の試験':STYPES[k].name;
     h+='<button class="stg'+(c.has(k)?' done':'')+'" data-stage="'+k+'"><b>'+k+'</b><span>'+n+'×'+n+'<br>'+t+'</span></button>';}
-  $('#stages').innerHTML=h;}
+  $('#stages').innerHTML=h;
+  document.querySelectorAll('.kind').forEach(b=>b.setAttribute('aria-pressed',b.dataset.kind===KIND?'true':'false'));
+  $('#kindLead').textContent=KINDS[KIND];}
 renderStages();
+$('#kinds').addEventListener('click',e=>{const b=e.target.closest('.kind'); if(!b)return; KIND=b.dataset.kind; try{localStorage.setItem('gdlab-kind',KIND);}catch(_){} renderStages();});
 let FLIP=false; // 撃たれたマスの色が反転するルール（v11 で試し、本人の判断で外した）
 
 // ---- 音 ----
@@ -209,7 +233,7 @@ function startRun(mode,stage){
   if(mode)MODE=mode; stage=stage||1; 
   if(!AC){try{AC=new (window.AudioContext||window.webkitAudioContext)();}catch(e){}} else if(AC.state==='suspended')AC.resume();
   G={room:0,totalT:0,state:'play',T:0,hz:[],gid:0,shake:0,flash:0,cause:null,erased:[],gained:[]};
-  $('#ovStart').hidden=true; $('#result').hidden=false; $('#foot').textContent=MODES[MODE].foot+'　（試作 v16）';
+  $('#ovStart').hidden=true; $('#result').hidden=false; $('#foot').textContent=MODES[MODE].foot+'　（試作 '+VER+'）';
   $('#modeTag').textContent=MODES[MODE].name+(MODE==='paint'&&FLIP?'・反転':''); G.startStage=stage; enterRoom(stage);
 }
 function nearest(fl,tx,ty,not){let best=null,bd=1e9;for(const f of fl){if(not&&f[0]===not[0]&&f[1]===not[1])continue;
@@ -221,12 +245,20 @@ function enterRoom(k){
   else bots.push(mk(nearest(fl,c,c)));
   function mk(p){return {x:p[0],y:p[1],tx:p[0],ty:p[1],fx:p[0],fy:p[1],mt:0,moving:false,q:null,vx:p[0],vy:p[1],bump:null};}
   Object.assign(G,{room:k,state:'play',T:0,hz:[],bots,exits:null,exitAt:Math.min(20,11+k*1.5),nextSpawn:.9,nextEraser:2.2,enter:1,erased:[],gained:[]});
-  if(MODE==='paint'){const ratio=paintRatio(k); G.paint=new Map([[bots[0].x+','+bots[0].y,-1]]); G.lastPaint=-1; G.ratio=ratio; G.goal=Math.ceil(fl.length*ratio);}
+  if(PAINTY()){G.paint=new Map([[bots[0].x+','+bots[0].y,-1]]); G.lastPaint=-1; G.fx=[];}
+  G.dead=null; G.lock=null; G.lanes=null; G.src=null; G.terms=null; G.live=null;
+  if(MODE==='paint'){const ratio=paintRatio(k); G.ratio=ratio; G.goal=Math.ceil(fl.length*ratio);}
+  if(MODE==='cut'){G.dead=new Set(); G.lock=new Set(); G.lanes=lanesOf(); G.cutN=0; G.stopN=0; checkLanes();}
+  if(MODE==='wire')setupWire(bots[0],k);
   bannerQ.length=0; bannerT=0;
   if(MODE==='duo')banner('区画 '+k+'：'+N+'×'+N,'左手で L、右手で R。出口が開いたら、それぞれの出口へ');
+  else if(MODE==='cut')banner('ステージ '+k+'：発射口 '+G.lanes.length+' 個','行か列の床を全部塗ると、その発射口が壊れて緑で確定する。予告の途中でも止められる。全部止めれば突破');
+  else if(MODE==='wire')banner('ステージ '+k+'：端子 '+G.terms.length+' 個','電源から端子まで、通った跡でつなぐ。つながっている間だけ充電が進み、満タンで新しい電源になる。全部で突破');
   else banner('ステージ '+k+'：'+N+'×'+N,(G.goal>=fl.length?'床を全部（':'床の '+Math.round(G.ratio*100)+'%（')+G.goal+' マス）塗れば突破。色を消すのは赤紫の消し弾だけ。熱い床は塗れない間、数に入れない');
   const t=STYPES[Math.min(STYPES.length-1,k)];
   if(MODE==='paint'&&k===1)banner('消し弾',TMAP.eraser.desc);
+  if(MODE==='cut'&&k===1)banner('消し弾','赤紫の弾は、青いマスの色を消す。緑で確定したマスは消せない。当たると倒れる');
+  if(MODE==='wire'&&k===1)banner('消し弾','赤紫の弾は、通った列の配線を切る。電源と充電した端子は消せない。当たると倒れる');
   if(k>1&&k<STYPES.length)banner('新しい試験：'+t.name,t.desc);
   beep(330,.3,'sine',.05,880);
 }
@@ -252,8 +284,54 @@ function tryMove(bi,dx,dy){
   const nx=b.x+dx,ny=b.y+dy, other=G.bots.some((o,i)=>i!==bi&&o.x===nx&&o.y===ny);
   if(!walk(nx,ny)||other){b.bump={dx,dy,t:G.T}; beep(140,.06,'square',.025); return false;}
   Object.assign(b,{fx:b.vx,fy:b.vy,x:nx,y:ny,mt:G.T,moving:true}); beep(bi?600:520+ri(60),.04,'triangle',.03);
-  if(MODE==='paint'){const k=nx+','+ny; if(!G.paint.has(k)){G.paint.set(k,G.T+MOVE); G.lastPaint=G.T+MOVE; setTimeout(()=>beep(760+G.paint.size*8,.05,'sine',.025),MOVE*1000);}}
+  if(PAINTY()){const k=nx+','+ny; if(!G.paint.has(k)){G.paint.set(k,G.T+MOVE); G.lastPaint=G.T+MOVE; setTimeout(()=>beep(760+Math.min(40,G.paint.size)*8,.05,'sine',.025),MOVE*1000);
+    checkLanes(); relive();}}
   return true;
+}
+
+// ---- 遮断：行・列を塗りそろえると、その発射口が壊れる ----
+// 発射口は行・列ごとに 1 組（両端）。その行（列）の床が全部塗られたら壊れ、床は確定（消し弾で消えない）。
+// その発射口が出していた攻撃は、予告中でも撃っている途中でも止まる。壊れた行・列からは、線の攻撃が来なくなる
+function lanesOf(){const a=[];
+  for(const axis of ['row','col'])for(let idx=0;idx<N;idx++){const cells=[]; for(let j=0;j<N;j++){const c=axis==='row'?[j,idx]:[idx,j]; if(walk(c[0],c[1]))cells.push(c);}
+    if(cells.length)a.push({axis,idx,key:axis+':'+idx,cells});}
+  return a;}
+const laneDead=(axis,idx)=>MODE==='cut'&&!!G&&!!G.dead&&G.dead.has(axis+':'+idx);
+const lockedAt=k=>!!(G.lock&&G.lock.has(k))||!!(G.src&&G.src.has(k));
+function laneLeft(l){let n=0; for(const c of l.cells)if(!G.paint.has(c[0]+','+c[1]))n++; return n;}
+function checkLanes(){
+  if(MODE!=='cut'||!G.lanes)return; let n=0,stopped=0;
+  for(const l of G.lanes){ if(G.dead.has(l.key)||laneLeft(l))continue;
+    G.dead.add(l.key); n++; for(const c of l.cells)G.lock.add(c[0]+','+c[1]);
+    const cut=G.hz.filter(h=>h.axis===l.axis&&h.idx===l.idx&&h.te>G.T); stopped+=cut.length;
+    if(cut.length)G.hz=G.hz.filter(h=>!cut.includes(h));
+    G.fx.push({l,t:G.T+MOVE,stopped:cut.some(h=>!h.fired||h.te>G.T)});}
+  if(n){G.cutN=(G.cutN||0)+n; if(stopped)G.stopN=(G.stopN||0)+1;
+    setTimeout(()=>{beep(stopped?392:523,.1,'sine',.05); setTimeout(()=>beep(stopped?1175:784,.22,'sine',.05),90);},MOVE*1000);}
+}
+
+// ---- 配線：電源から端子まで、通った跡でつなぐ ----
+// 電源からつながっている跡だけが「通電」。端子は通電している間だけ充電が進み、満タンで確定して電源になる。切れている間は少しずつ減る
+const CHARGE=3.2, DECAY=7;
+function setupWire(b,k){
+  const fl=floors(), K=k<=1?2:k<=3?3:k<=5?4:5, pts=[[b.x,b.y]], terms=[];
+  for(let i=0;i<K;i++){const ds=pts.map(p=>distFrom(p[0],p[1])); let best=null,bd=-1;
+    for(const f of fl){if(pts.some(p=>p[0]===f[0]&&p[1]===f[1]))continue; const key=f[0]+','+f[1];
+      const d=Math.min(...ds.map(m=>m.has(key)?m.get(key):99))+Math.random()*.9; if(d>bd){bd=d;best=f;}}
+    if(!best)break; pts.push(best); terms.push({x:best[0],y:best[1],ch:0,done:false,on:false,t:0});}
+  G.src=new Set([b.x+','+b.y]); G.terms=terms; G.live=new Set(G.src);
+}
+function relive(){
+  if(MODE!=='wire'||!G.src)return; const live=new Set(), q=[];
+  for(const s of G.src){live.add(s); q.push(s.split(',').map(Number));}
+  while(q.length){const [x,y]=q.pop(); for(const [dx,dy] of D4){const k=(x+dx)+','+(y+dy); if(!live.has(k)&&G.paint.has(k)){live.add(k); q.push([x+dx,y+dy]);}}}
+  G.live=live;
+}
+function stepWire(dt,T){
+  for(const t of G.terms){ if(t.done)continue; const k=t.x+','+t.y, on=G.live.has(k)&&T>=(G.paint.get(k)||0);
+    if(on!==t.on){t.on=on; beep(on?660:240,.12,'sine',.04,on?990:160);}
+    t.ch=clamp(t.ch+(on?dt/CHARGE:-dt/DECAY));
+    if(t.ch>=1){t.done=true; t.t=T; G.src.add(k); relive(); beep(523,.1,'sine',.05); setTimeout(()=>beep(1047,.25,'sine',.05),90);}}
 }
 function stepBots(T){
   for(const b of G.bots){
@@ -268,17 +346,19 @@ function stepBots(T){
 function travel(axis,idx,side){const p=[];let stop=false;
   for(let i=0;i<N;i++){const j=side?N-1-i:i, c=axis==='row'?[j,idx]:[idx,j]; if(at(c[0],c[1])===2){stop=true;break;} p.push(c);}
   return {path:p,stop};}
-function lineOk(axis,idx,side){return travel(axis,idx,side).path.some(c=>walk(c[0],c[1]));}
-// aim のとき、狙うロボットの行か列を必ず通る線にする
+function lineOk(axis,idx,side){return !laneDead(axis,idx)&&travel(axis,idx,side).path.some(c=>walk(c[0],c[1]));}
+// aim のとき、狙うロボットの行か列を必ず通る線にする。遮断では、生きている発射口からだけ出す
 function pickLine(b,aim){
-  for(let g=0;g<20;g++){const axis=Math.random()<.5?'row':'col', side=ri(2), idx=aim?(axis==='row'?b.y:b.x):ri(N);
+  const alive=MODE==='cut'&&G.lanes?G.lanes.filter(l=>!G.dead.has(l.key)):null; if(alive&&!alive.length)return null;
+  for(let g=0;g<20;g++){let axis=Math.random()<.5?'row':'col', side=ri(2), idx=aim?(axis==='row'?b.y:b.x):ri(N);
+    if(alive&&!aim){const l=alive[ri(alive.length)]; axis=l.axis; idx=l.idx;}
     if(lineOk(axis,idx,side)&&(!aim||has(travel(axis,idx,side).path,b.x,b.y)))return {axis,idx,side};}
   return null;}
 function mkLine(type,L,t0,tf,dur,extra){const tr=travel(L.axis,L.idx,L.side);
   return Object.assign({type,axis:L.axis,idx:L.idx,side:L.side,path:tr.path,stop:tr.stop,cells:tr.path.filter(c=>walk(c[0],c[1])),t0,tf,te:tf+dur,blocks:type==='beam'},extra||{});}
 function eraserLine(){const c=[];
-  for(const axis of ['row','col'])for(let idx=0;idx<N;idx++)for(const side of [0,1]){const tr=travel(axis,idx,side); if(!tr.path.some(q=>walk(q[0],q[1])))continue;
-    const n=tr.path.filter(q=>G.paint.has(q[0]+','+q[1])).length; c.push([{axis,idx,side},n+Math.random()*2.5]);}
+  for(const axis of ['row','col'])for(let idx=0;idx<N;idx++)for(const side of [0,1]){if(laneDead(axis,idx))continue; const tr=travel(axis,idx,side); if(!tr.path.some(q=>walk(q[0],q[1])))continue;
+    const n=tr.path.filter(q=>G.paint.has(q[0]+','+q[1])&&!lockedAt(q[0]+','+q[1])).length; c.push([{axis,idx,side},n+Math.random()*2.5]);}
   c.sort((a,b)=>b[1]-a[1]); return c.length?c[ri(Math.min(4,c.length))][0]:null;}
 function randFloor(){const f=floors();return f[ri(f.length)];}
 function build(type,bi,aim){
@@ -288,9 +368,9 @@ function build(type,bi,aim){
   if(type==='eraser'){const L=aim?eraserLine():pickLine(b,false); if(!L)return null; const per=lerp(.36,.24,d), tf=T+w*.95; const h=mkLine('eraser',L,T,tf,0,{gid,per,blocks:false}); h.te=tf+(h.path.length+.7)*per; h.cells=[]; return [h];}
   if(type==='beam'){const L=pickLine(b,aim); return L&&[mkLine('beam',L,T,T+w*1.1,2.3+Math.random()*1.1,{gid})];}
   if(type==='panel'){
-    const cells=[aim?[b.x,b.y]:randFloor()]; const k=MODE==='paint'?(N>=5?3:2):(N>=5&&d>.35?2:1);
+    const cells=[aim?[b.x,b.y]:randFloor()]; const k=PAINTY()?(N>=5?3:2):(N>=5&&d>.35?2:1);
     // 塗る方では、ロボットの近くの塗ったマスを狙って熱くする（行き先をふさぐ）
-    if(MODE==='paint'){const pc=[...G.paint.keys()].map(q=>q.split(',').map(Number)).filter(c=>walk(c[0],c[1])&&!has(cells,c[0],c[1]))
+    if(PAINTY()){const pc=[...G.paint.keys()].map(q=>q.split(',').map(Number)).filter(c=>walk(c[0],c[1])&&!has(cells,c[0],c[1])&&!lockedAt(c[0]+','+c[1]))
       .map(c=>[c,Math.abs(c[0]-b.x)+Math.abs(c[1]-b.y)+Math.random()*1.5]).sort((p,q)=>p[1]-q[1]);
       for(const [c] of pc){if(cells.length>=k)break; cells.push(c);}}
     for(let g=0;cells.length<k&&g<20;g++){const c=randFloor(); if(!has(cells,c[0],c[1]))cells.push(c);}
@@ -349,7 +429,7 @@ function fair(cands){
 }
 // 出す障害を選ぶ。新しい試験を多めに出す。塗る方では球を少なくし、同時に出る数も絞る（球は通った列の色を順に消し、重いので）
 function pickType(al,T){
-  const paint=MODE==='paint', orbCap=N>=5?2:1, orbs=G.hz.filter(h=>h.type==='orb'&&h.te>T).length;
+  const paint=PAINTY(), orbCap=N>=5?2:1, orbs=G.hz.filter(h=>h.type==='orb'&&h.te>T).length;
   const drones=G.hz.some(h=>h.type==='drone'&&h.te>T);
   const ok=al.filter(id=>!(paint&&id==='orb'&&orbs>=orbCap)&&!(id==='drone'&&drones));
   const newest=al[al.length-1];
@@ -359,7 +439,7 @@ function pickType(al,T){
 }
 function eraserGap(){return lerp(3.6,1.9,clamp((G.room-1)/6))*(.8+Math.random()*.4);}
 function spawnEraser(){
-  const T=G.T; if(MODE!=='paint')return; if(G.nextEraser===undefined)G.nextEraser=2.2; if(T<G.nextEraser)return;
+  const T=G.T; if(!PAINTY())return; if(G.nextEraser===undefined)G.nextEraser=2.2; if(T<G.nextEraser)return;
   if(G.hz.filter(h=>h.type==='eraser'&&h.te>T).length>=(G.room>=5?3:2)){G.nextEraser=T+.3;return;}
   for(let i=0;i<10;i++){const c=build('eraser',0,i<7); if(c&&c.length&&fair(c)){G.hz.push(...c); beep(520,.08,'square',.025); G.nextEraser=T+eraserGap(); return;}}
   G.nextEraser=T+.2;
@@ -412,23 +492,29 @@ function update(dt){
   for(const h of G.hz)if(!h.fired&&T>=h.tf){h.fired=true; if(h.type==='beam'||h.type==='panel')beep(110,.35,'sawtooth',.03,90); else if(!ROLL(h))beep(1200,.12,'sawtooth',.025,300); else beep(200,.3,'triangle',.04,120);}
   // 塗った色を消すのは消し弾だけ（ほかの危険は当たると倒れるだけの障害物）
   // 撃たれたマス：塗ってあれば消える。反転のルールでは、塗っていなければ塗られる（障害 1 つにつき 1 マス 1 回）
-  if(MODE==='paint'){let gain=0; for(const h of G.hz)if(h.type==='eraser'&&active(h,T)){h.flip=h.flip||new Set(); for(const c of cellsAt(h,T)){const k=c[0]+','+c[1]; if(h.flip.has(k))continue; h.flip.add(k);
-    if(G.paint.has(k)){G.paint.delete(k); G.erased.push({x:c[0],y:c[1],t:T});} else if(FLIP){G.paint.set(k,T); G.lastPaint=T; G.gained.push({x:c[0],y:c[1],t:T}); gain++;}}}
-    if(gain)beep(900+gain*40,.08,'sine',.03,1400);}
+  if(PAINTY()){let gain=0,lost=0; for(const h of G.hz)if(h.type==='eraser'&&active(h,T)){h.flip=h.flip||new Set(); for(const c of cellsAt(h,T)){const k=c[0]+','+c[1]; if(h.flip.has(k))continue; h.flip.add(k);
+    if(lockedAt(k))continue; // 確定したマス・電源は消せない
+    if(G.paint.has(k)){G.paint.delete(k); G.erased.push({x:c[0],y:c[1],t:T}); lost++;} else if(FLIP&&MODE==='paint'){G.paint.set(k,T); G.lastPaint=T; G.gained.push({x:c[0],y:c[1],t:T}); gain++;}}}
+    if(gain)beep(900+gain*40,.08,'sine',.03,1400);
+    if(lost)relive();}
+  if(MODE==='wire')stepWire(dt,T);
+  if(G.fx)G.fx=G.fx.filter(e=>T-e.t<.9);
   G.gained=G.gained.filter(e=>T-e.t<.6);
   G.erased=G.erased.filter(e=>T-e.t<.6);
   stepBots(T);
   if(!G.god)for(let i=0;i<G.bots.length;i++){const b=G.bots[i]; for(const h of G.hz)if(active(h,T)&&has(cellsAt(h,T),b.x,b.y)){die(h,i);return;}}
   if(MODE==='duo'&&G.exits&&G.bots.every((b,i)=>b.x===G.exits[i][0]&&b.y===G.exits[i][1])){G.state='finish'; G.finishAt=T+MOVE+.2; return;}
   if(MODE==='paint'&&G.paint.size>=need()){G.state='finish'; G.finishAt=Math.max(T,G.lastPaint)+PAINT_T+.2; return;}
+  if(MODE==='cut'&&G.dead.size>=G.lanes.length){G.state='finish'; G.hz=[]; G.finishAt=Math.max(T,G.lastPaint)+PAINT_T+.45; return;}
+  if(MODE==='wire'&&G.terms.every(t=>t.done)){G.state='finish'; G.hz=[]; G.finishAt=T+.6; return;}
   G.hz=G.hz.filter(h=>h.te>T-.35);
   spawn();
 }
 function clearRoom(){
   G.state='clear'; G.clearT=0; G.hz=[]; beep(523,.12,'sine',.05); setTimeout(()=>beep(784,.2,'sine',.05),120);
   if(G.room>getBest(MODE))setBest(MODE,G.room);
-  if(MODE==='paint'){addCleared(G.room); renderStages();}
-  banner((MODE==='paint'?'ステージ ':'区画 ')+G.room+' を突破',MODE==='paint'&&G.room>=STAGES?'最後のステージ。続けて遊べる':'次へ');
+  if(PAINTY()){addCleared(MODE,G.room); renderStages();}
+  banner((PAINTY()?'ステージ ':'区画 ')+G.room+' を突破',PAINTY()&&G.room>=STAGES?'最後のステージ。続けて遊べる':'次へ');
 }
 function die(h,bi){
   G.state='dead'; G.cause=h; G.deadBot=bi; G.shake=1; G.flash=1; beep(220,.6,'sawtooth',.06,40);
@@ -438,15 +524,16 @@ function showResult(){
   if(!G||G.state!=='dead')return;
   const cleared=G.room-(G.startStage||1), best=getBest(MODE), cause='当たった障害：<b style="color:'+TMAP[G.cause.type].color+'">'+TMAP[G.cause.type].name+'</b>';
   $('#rHead').textContent='終了：'+MODES[MODE].name+(MODE==='paint'&&FLIP?'（反転）':'');
-  if(MODE==='paint'){
+  if(PAINTY()){
+    const prog=MODE==='cut'?'止めた発射口 '+G.dead.size+' ／ '+G.lanes.length+(G.stopN?'（予告の途中で止めた '+G.stopN+' 回）':''):MODE==='wire'?'充電した端子 '+G.terms.filter(t=>t.done).length+' ／ '+G.terms.length:'塗った '+G.paint.size+' ／ '+G.goal+' マス';
     $('#rMain').textContent='ステージ '+G.room+' で失敗';
-    $('#rSub').innerHTML='塗った '+G.paint.size+' ／ '+G.goal+' マス　／　'+G.totalT.toFixed(1)+' 秒<br>'+cause+'<br>ステージ '+G.startStage+' から '+cleared+' つ突破';
+    $('#rSub').innerHTML=prog+'　／　'+G.totalT.toFixed(1)+' 秒<br>'+cause+'<br>ステージ '+G.startStage+' から '+cleared+' つ突破';
   } else {
     $('#rMain').textContent='区画 '+G.room+' で停止';
     $('#rSub').innerHTML='突破 '+cleared+' 区画　／　'+G.totalT.toFixed(1)+' 秒<br>'+cause+'（'+BOTN[G.deadBot]+' が当たった）<br>'+(cleared>0&&cleared>=best?'最高記録':'最高：区画 '+best+' まで突破');
   }
   $('#ovStart').hidden=false; showBest();
-  const f=MODE==='paint'?document.querySelector('.stg[data-stage="'+G.room+'"]'):document.querySelector('.modeBtn[data-mode="duo"]'); if(f)f.focus({preventScroll:true});
+  const f=PAINTY()?document.querySelector('.stg[data-stage="'+G.room+'"]'):document.querySelector('.modeBtn[data-mode="duo"]'); if(f)f.focus({preventScroll:true});
 }
 
 // ---- 描く ----
@@ -464,19 +551,29 @@ function lineEnd(h,g){const step=CS+GAP; if(h.stop){const i=h.path.length; retur
 function band(h,g,a0,a1,th){const lo=Math.min(a0,a1),hi=Math.max(a0,a1); if(h.axis==='row')ctx.fillRect(lo,g.c-th/2,hi-lo,th); else ctx.fillRect(g.c-th/2,lo,th,hi-lo);}
 
 function drawRoom(T){
-  const e=G?G.enter:0;
+  const e=G?G.enter:0, cutM=!!(G&&MODE==='cut'&&G.lanes);
+  // 壁の発射口。遮断では、生きている発射口は赤、壊した発射口は緑
+  const emCol=(has,key)=>!has?'#0c141e':!cutM?'#16283a':G.dead.has(key)?'#17705c':'#b33a55';
   for(let i=0;i<N;i++){
     let rowHas=false,colHas=false; for(let j=0;j<N;j++){if(at(j,i)===1)rowHas=true; if(at(i,j)===1)colHas=true;}
     const m=cx(i)+CS/2, n=cy(i)+CS/2;
-    ctx.fillStyle=colHas?'#16283a':'#0c141e'; ctx.fillRect(m-CS*.2,BY-22,CS*.4,6); ctx.fillRect(m-CS*.2,BY+S+16,CS*.4,6);
-    ctx.fillStyle=rowHas?'#16283a':'#0c141e'; ctx.fillRect(BX-22,n-CS*.2,6,CS*.4); ctx.fillRect(BX+S+16,n-CS*.2,6,CS*.4);
+    ctx.fillStyle=emCol(colHas,'col:'+i); ctx.fillRect(m-CS*.2,BY-22,CS*.4,6); ctx.fillRect(m-CS*.2,BY+S+16,CS*.4,6);
+    ctx.fillStyle=emCol(rowHas,'row:'+i); ctx.fillRect(BX-22,n-CS*.2,6,CS*.4); ctx.fillRect(BX+S+16,n-CS*.2,6,CS*.4);
   }
+  // 遮断：行・列ごとに、塗り残しの数を発射口の外側に出す（あと 1 は黄色）
+  if(cutM){ctx.textAlign='center'; ctx.textBaseline='middle';
+    for(const l of G.lanes){if(G.dead.has(l.key))continue; const n=laneLeft(l), hot=n<=1;
+      ctx.fillStyle=hot?'#ffe066':'rgba(216,236,245,.62)'; ctx.font='700 '+(hot?14:11)+'px '+FNUM;
+      if(l.axis==='row')ctx.fillText(n,BX-33,cy(l.idx)+CS/2+1); else ctx.fillText(n,cx(l.idx)+CS/2,BY-33);}}
   for(let y=0;y<N;y++)for(let x=0;x<N;x++){
     const v=at(x,y); if(!v)continue;
     const X=cx(x),Y=cy(y); ctx.globalAlpha=e>0?clamp(1-e*1.4+((x+y)/(2*N))*.8):1;
-    if(v===1){const pt0=G&&MODE==='paint'&&G.paint?G.paint.get(x+','+y):undefined, painted=pt0!==undefined&&T>=pt0, pa=painted?clamp((T-pt0)/PAINT_T):0;
-      ctx.fillStyle=painted&&pa>.5?'#1a6f8e':'#172c40'; rr(X,Y,CS,CS,4); ctx.fill(); ctx.strokeStyle=painted?'#86eaff':'rgba(140,205,240,.55)'; ctx.lineWidth=painted?2.5:1.5; ctx.stroke();
-      if(painted){const o=CS*(.5-.36*pa); ctx.fillStyle='rgba(150,235,255,'+(.3+.5*(1-pa))+')'; rr(X+o,Y+o,CS-2*o,CS-2*o,3); ctx.fill();}
+    if(v===1){const key=x+','+y, pt0=G&&PAINTY()&&G.paint?G.paint.get(key):undefined, painted=pt0!==undefined&&T>=pt0, pa=painted?clamp((T-pt0)/PAINT_T):0;
+      const lock=painted&&MODE==='cut'&&G.lock.has(key), off=painted&&MODE==='wire'&&!G.live.has(key); // 確定したマス／電源から切れた配線
+      ctx.fillStyle=!(painted&&pa>.5)?'#172c40':lock?'#17705c':off?'#1c3344':'#1a6f8e'; rr(X,Y,CS,CS,4); ctx.fill();
+      ctx.strokeStyle=!painted?'rgba(140,205,240,.55)':lock?'#7dffd8':off?'rgba(134,234,255,.4)':'#86eaff'; ctx.lineWidth=painted&&!off?2.5:1.5; ctx.stroke();
+      if(painted&&!off){const o=CS*(.5-.36*pa); ctx.fillStyle=(lock?'rgba(125,255,216,':'rgba(150,235,255,')+(.3+.5*(1-pa))+')'; rr(X+o,Y+o,CS-2*o,CS-2*o,3); ctx.fill();}
+      if(lock&&pa>=1){const q=CS*.09; ctx.fillStyle='#7dffd8'; ctx.fillRect(X+CS/2-q,Y+CS/2-q,2*q,2*q);}
       ctx.fillStyle='rgba(79,216,255,.35)'; const k=Math.max(3,CS*.08);
       ctx.fillRect(X+3,Y+3,k,1.5); ctx.fillRect(X+3,Y+3,1.5,k); ctx.fillRect(X+CS-3-k,Y+CS-4.5,k,1.5); ctx.fillRect(X+CS-4.5,Y+CS-3-k,1.5,k);}
     else{ // 柱
@@ -486,6 +583,7 @@ function drawRoom(T){
       ctx.fillStyle='#8fb3c8'; ctx.fillRect(X+CS*.3,Y+CS*.34,CS*.4,2);}
     ctx.globalAlpha=1;
   }
+  if(G&&MODE==='wire'&&G.terms)drawWire(T);
   if(G)for(const er of G.erased){const q=(T-er.t)/.6, X=cx(er.x),Y=cy(er.y); ctx.strokeStyle='#ff4d6d'; ctx.globalAlpha=1-q; ctx.lineWidth=2;
     const o=q*CS*.15; rr(X-o,Y-o,CS+2*o,CS+2*o,5); ctx.stroke(); ctx.globalAlpha=1;}
   if(G)for(const g of G.gained){const q=(T-g.t)/.6, X=cx(g.x),Y=cy(g.y); ctx.strokeStyle='#eafcff'; ctx.globalAlpha=(1-q)*.9; ctx.lineWidth=2;
@@ -494,6 +592,31 @@ function drawRoom(T){
     glow(col,18); ctx.fillStyle=col; ctx.globalAlpha=.2+.12*Math.sin(T*6); rr(X,Y,CS,CS,4); ctx.fill(); ctx.shadowBlur=0; ctx.globalAlpha=1;
     ctx.strokeStyle=col; ctx.lineWidth=2; for(let j=0;j<2;j++){const q=(p+j*.5)%1, o=q*CS*.4; ctx.globalAlpha=1-q; rr(X+o,Y+o,CS-2*o,CS-2*o,4); ctx.stroke();}
     ctx.globalAlpha=1; ctx.fillStyle=col; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.font='700 '+Math.max(10,CS*.2)+'px '+FJP; ctx.fillText('出口 '+BOTN[i],X+CS/2,Y+CS*.78);});
+}
+// 配線：つながり・電源・端子
+function drawWire(T){
+  const P=(x,y)=>{const t=G.paint.get(x+','+y); return t!==undefined&&T>=t;}, th=CS*.26;
+  for(let y=0;y<N;y++)for(let x=0;x<N;x++){ if(!P(x,y))continue; const a=G.live.has(x+','+y);
+    for(const [dx,dy] of [[1,0],[0,1]]){ if(!P(x+dx,y+dy))continue; const on=a&&G.live.has((x+dx)+','+(y+dy));
+      ctx.fillStyle=on?'#86eaff':'rgba(134,234,255,.3)';
+      if(dx)ctx.fillRect(cx(x)+CS-1,cy(y)+CS/2-th/2,GAP+2,th); else ctx.fillRect(cx(x)+CS/2-th/2,cy(y)+CS-1,th,GAP+2);}}
+  for(const s of G.src){const [x,y]=s.split(',').map(Number), X=cx(x),Y=cy(y), m=CS*.17, mx=X+CS/2, my=Y+CS/2, u=CS*.1;
+    glow('#7dffd8',16); ctx.fillStyle='#7dffd8'; rr(X+m,Y+m,CS-2*m,CS-2*m,4); ctx.fill(); ctx.shadowBlur=0;
+    ctx.fillStyle='#06241d'; ctx.beginPath(); ctx.moveTo(mx+u*.7,my-u*2.2); ctx.lineTo(mx-u*1.3,my+u*.35); ctx.lineTo(mx-u*.1,my+u*.35);
+    ctx.lineTo(mx-u*.7,my+u*2.2); ctx.lineTo(mx+u*1.3,my-u*.35); ctx.lineTo(mx+u*.1,my-u*.35); ctx.closePath(); ctx.fill();}
+  for(const t of G.terms){ if(t.done)continue; const X=cx(t.x),Y=cy(t.y), mx=X+CS/2, my=Y+CS/2, r=CS*.34, col=t.on?'#ffe066':'#c9a23a';
+    ctx.lineWidth=Math.max(3,CS*.1); ctx.strokeStyle='rgba(216,236,245,.32)'; ctx.beginPath(); ctx.arc(mx,my,r,0,7); ctx.stroke();
+    if(t.ch>0){if(t.on)glow(col,12); ctx.strokeStyle=col; ctx.beginPath(); ctx.arc(mx,my,r,-Math.PI/2,-Math.PI/2+Math.PI*2*t.ch); ctx.stroke(); ctx.shadowBlur=0;}
+    ctx.fillStyle=t.on?'#ffe066':'rgba(216,236,245,.6)'; ctx.beginPath(); ctx.arc(mx,my,CS*.1+(t.on?Math.sin(T*10)*CS*.02:0),0,7); ctx.fill();}
+}
+// 遮断：そろえた行・列が光り、「遮断」と出る
+function drawFx(T){
+  if(!G.fx)return;
+  for(const e of G.fx){const q=(T-e.t)/.9; if(q<0||q>=1)continue; const l=e.l, mid=l.cells[l.cells.length>>1];
+    ctx.fillStyle='#eafff8'; ctx.globalAlpha=(1-q)*(1-q)*.6; for(const c of l.cells){rr(cx(c[0]),cy(c[1]),CS,CS,4); ctx.fill();}
+    ctx.globalAlpha=clamp(1.4-q*1.4); ctx.font='700 '+Math.max(13,Math.min(20,CS*.3))+'px '+FJP; ctx.textAlign='center'; ctx.textBaseline='middle';
+    const tx=clamp(cx(mid[0])+CS/2,60,W-60), ty=cy(mid[1])+CS/2-q*CS*.5, s=e.stopped?'攻撃ごと遮断':'遮断';
+    ctx.lineWidth=4; ctx.strokeStyle='#06090f'; ctx.strokeText(s,tx,ty); ctx.fillStyle=e.stopped?'#ffe066':'#7dffd8'; ctx.fillText(s,tx,ty); ctx.globalAlpha=1;}
 }
 function drawHazards(T){
   for(const h of G.hz){
@@ -526,7 +649,7 @@ function drawHazards(T){
     if(T>=h.te)continue;
     // これから通る塗ったマスを点滅させ、×を付ける（消される予告）
     const bl=.45+.45*Math.sin(T*16);
-    h.path.forEach((c,i)=>{ if(i<u-.4||!G.paint.has(c[0]+','+c[1]))return; const X=cx(c[0]),Y=cy(c[1]);
+    h.path.forEach((c,i)=>{ if(i<u-.4||!G.paint.has(c[0]+','+c[1])||lockedAt(c[0]+','+c[1]))return; const X=cx(c[0]),Y=cy(c[1]);
       ctx.strokeStyle=col; ctx.globalAlpha=bl; ctx.lineWidth=3; rr(X+2,Y+2,CS-4,CS-4,4); ctx.stroke();
       ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(X+CS*.3,Y+CS*.3); ctx.lineTo(X+CS*.7,Y+CS*.7); ctx.moveTo(X+CS*.7,Y+CS*.3); ctx.lineTo(X+CS*.3,Y+CS*.7); ctx.stroke(); ctx.globalAlpha=1;});
     const dia=(x,y,r)=>{ctx.beginPath(); ctx.moveTo(x,y-r); ctx.lineTo(x+r,y); ctx.lineTo(x,y+r); ctx.lineTo(x-r,y); ctx.closePath();};
@@ -616,14 +739,16 @@ function draw(){
     ctx.fillStyle=BOTC[0]; ctx.fillText('L',W*.25,H-4); ctx.fillStyle=BOTC[1]; ctx.fillText('R',W*.75,H-4); ctx.globalAlpha=1;}
   if(G&&G.shake>0)ctx.translate((Math.random()-.5)*12*G.shake,(Math.random()-.5)*12*G.shake);
   drawRoom(T);
-  if(G){ if(G.state!=='clear')drawHazards(T); drawBots(T); if(G.state==='play')drawPulseCenters(T);
+  if(G){ if(G.state!=='clear')drawHazards(T); drawBots(T); if(G.state==='play')drawPulseCenters(T); drawFx(T);
     if(G.flash>0){ctx.setTransform(DPR,0,0,DPR,0,0); ctx.fillStyle='rgba(255,77,109,'+(G.flash*.35)+')'; ctx.fillRect(0,0,W,H);}}
 }
 function hud(){
   if(!G)return;
-  $('#room').textContent=(MODE==='paint'?'ステージ ':'区画 ')+G.room; $('#shape').textContent=N+'×'+N+'　床 '+floors().length;
+  $('#room').textContent=(PAINTY()?'ステージ ':'区画 ')+G.room; $('#shape').textContent=N+'×'+N+'　床 '+floors().length;
   const t=$('#time'), L=$('#midLabel');
   if(G.state==='clear'){L.textContent='突破'; t.textContent='CLEAR'; t.className='open';}
+  else if(MODE==='cut'){L.textContent='止めた発射口 ／ 全部'; t.textContent=G.dead.size+'/'+G.lanes.length; t.className=G.lanes.length-G.dead.size<=2?'open':'';}
+  else if(MODE==='wire'){const dn=G.terms.filter(q=>q.done).length; L.textContent='充電した端子 ／ 全部'; t.textContent=dn+'/'+G.terms.length; t.className=G.terms.length-dn<=1?'open':'';}
   else if(MODE==='paint'){L.textContent='塗った床 ／ 目標'; const nd=need(); t.textContent=G.paint.size+'/'+nd; t.className=G.paint.size>=nd-2?'open':'';}
   else if(G.exits){L.textContent='出口が開いた'; t.textContent='L・R 出口へ'; t.className='open'; t.style.fontSize='22px';}
   else {L.textContent='出口が開くまで'; t.textContent=Math.max(0,G.exitAt-G.T).toFixed(1); t.className=''; t.style.fontSize='';}
@@ -640,7 +765,7 @@ requestAnimationFrame(frame);
 
 // ---- 操作 ----
 document.querySelectorAll('.modeBtn').forEach(b=>b.addEventListener('click',()=>startRun(b.dataset.mode)));
-$('#stages').addEventListener('click',e=>{const b=e.target.closest('.stg'); if(b)startRun('paint',+b.dataset.stage);});
+$('#stages').addEventListener('click',e=>{const b=e.target.closest('.stg'); if(b)startRun(KIND,+b.dataset.stage);});
 const K1={w:[0,-1],s:[0,1],a:[-1,0],d:[1,0]}, K2={ArrowUp:[0,-1],ArrowDown:[0,1],ArrowLeft:[-1,0],ArrowRight:[1,0]};
 let lastKey=0;
 window.addEventListener('keydown',e=>{
@@ -665,7 +790,7 @@ app.addEventListener('pointermove',e=>{
 function release(e){touches.delete(e.pointerId);}
 app.addEventListener('pointerup',release); app.addEventListener('pointercancel',release);
 // 試しの撮影用（画面には出ない）
-window.__lab={get G(){return G;},enterRoom:k=>{G.state='play';enterRoom(k);},startRun,genRoom,tryMove,step:update,routeOk:(x,y,c)=>routeOk(G.hz,x,y,c),walk:(x,y)=>walk(x,y)};
+window.__lab={get N(){return N;},canEnter:(x,y)=>canEnter(x,y,G.T),hzAt:(x,y,t)=>dangerSet(G.hz,t).has(x+','+y),laneLeft,distFrom,floors,get G(){return G;},enterRoom:k=>{G.state='play';enterRoom(k);},startRun,genRoom,tryMove,step:update,routeOk:(x,y,c)=>routeOk(G.hz,x,y,c),walk:(x,y)=>walk(x,y)};
 })();
 </script>
 </body>
